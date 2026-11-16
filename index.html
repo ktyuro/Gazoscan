@@ -16,6 +16,7 @@
   main{max-width:520px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
   header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
   h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
+  .ver{font-size:12px;font-weight:500;color:var(--mute);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 6px;vertical-align:3px;margin-left:4px}
   h2{font-size:13px;margin:0 0 10px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px;font-weight:500}
   .pill{font-size:13px;padding:5px 10px;border-radius:999px;background:var(--line);color:var(--txt);white-space:nowrap}
   .pill::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mute);vertical-align:1px}
@@ -103,7 +104,7 @@
 <body>
 <main>
   <header>
-    <h1>Gazoscan</h1>
+    <h1>Gazoscan <span id="appVersion" class="ver"></span></h1>
     <span id="state" class="pill">Déconnecté</span>
   </header>
 
@@ -235,6 +236,8 @@ const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';  // Transparent UAR
 const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616';  // notify : trames $…
 const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';  // write  : commandes
 const NAME_PREFIXES = ['G', 'g'];  // (1) seuls les appareils dont le nom commence par G
+const APP_VERSION = '1.2.0';       // à incrémenter à chaque mise en ligne
+const APP_DATE = '16/11/2026';
 const UNIT = 'ppm·m';              // unité affichée (à adapter)
 const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
 const HISTORY_MS = 60000;
@@ -313,6 +316,9 @@ let lastFrame = 0, last = null, history = [];
 let demoTimer = null, wakeLock = null, bleState = 'idle';
 
 $('unit').textContent = UNIT;
+$('appVersion').textContent = 'v' + APP_VERSION;
+$('appVersion').title = 'Version du ' + APP_DATE;
+document.title = `Gazoscan v${APP_VERSION} – Surveillance`;
 document.querySelectorAll('.u').forEach(e => e.textContent = UNIT);
 for (let i = 0; i < 12; i++) $('bars').appendChild(document.createElement('i'));
 
@@ -983,7 +989,7 @@ const PDF = (() => {
           obj(p.cid, [`<< /Length ${content.length} >>\nstream\n`, content, '\nendstream']);
           p.links.forEach((l, i) => obj(p.ann[i], `<< /Type /Annot /Subtype /Link /Rect [${n(l.x)} ${n(H - l.y - l.h)} ${n(l.x + l.w)} ${n(H - l.y)}] /Border [0 0 0] /A << /S /URI /URI (${enc(l.url)}) >> >>`));
         });
-        obj(infoId, `<< /Title (${enc(title.replace(/[–—]/g, '-').replace(/[’]/g, "'"))}) /Producer (Gazoscan Web) >>`);
+        obj(infoId, `<< /Title (${enc(title.replace(/[–—]/g, '-').replace(/[’]/g, "'"))}) /Producer (Gazoscan Web v${APP_VERSION}) >>`);
         const xref = len;
         let x = `xref\n0 ${total + 1}\n0000000000 65535 f \n`;
         for (let i = 1; i <= total; i++) x += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
@@ -1221,7 +1227,7 @@ function buildReport(m) {
   });
 
   // ---- Pieds de page ----
-  const gen = `Généré le ${fmtDate(Date.now())} par Gazoscan Web`;
+  const gen = `Généré le ${fmtDate(Date.now())} par Gazoscan Web v${APP_VERSION}`;
   d.pages.forEach((p, i) => {
     d.setPage(p);
     d.line([[M, d.H - 34], [d.W - M, d.H - 34]], C.line, 0.5);
