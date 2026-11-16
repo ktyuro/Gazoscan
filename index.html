@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
-<title>Gazoscan – Concentration</title>
+<title>Gazoscan – Surveillance</title>
 <style>
   :root{
     --bg:#0f172a; --card:#1e293b; --line:#334155; --txt:#e2e8f0; --mute:#94a3b8;
@@ -16,10 +16,11 @@
   main{max-width:520px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
   header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
   h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
+  h2{font-size:13px;margin:0 0 10px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px;font-weight:500}
   .pill{font-size:13px;padding:5px 10px;border-radius:999px;background:var(--line);color:var(--txt);white-space:nowrap}
   .pill::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mute);vertical-align:1px}
   .pill.connected::before{background:var(--ok)}
-  .pill.connecting::before,.pill.reconnecting::before{background:var(--warn);animation:blink 1s infinite}
+  .pill.connecting::before,.pill.reconnecting::before,.pill.searching::before{background:var(--warn);animation:blink 1s infinite}
   .pill.failed::before{background:var(--bad)}
   @keyframes blink{50%{opacity:.25}}
 
@@ -41,21 +42,62 @@
   .val small{font-size:13px;color:var(--mute);font-weight:400}
   .alarmbadge{display:inline-block;margin-top:8px;font-size:12px;padding:3px 8px;border-radius:6px;background:var(--line);color:var(--mute)}
   .alarmbadge.on{background:var(--bad);color:#fff}
-
   .bars{display:flex;gap:3px;align-items:flex-end;height:34px;margin-top:10px}
   .bars i{flex:1;background:var(--line);border-radius:2px}
   canvas{width:100%;height:120px;display:block;margin-top:8px}
 
-  .btns{display:flex;gap:10px;margin:14px 0}
+  .btns{display:flex;gap:10px;margin:12px 0}
   button{flex:1;font:inherit;font-size:16px;font-weight:600;padding:14px;border-radius:12px;border:0;cursor:pointer;color:#0f172a;background:var(--info)}
   button.sec{background:var(--line);color:var(--txt)}
-  button:disabled{opacity:.4}
+  button.go{background:var(--ok);color:#052e16}
+  button.danger{background:var(--bad);color:#fff}
+  button.small{flex:0 0 auto;font-size:13px;padding:8px 12px;border-radius:9px}
+  button:disabled{opacity:.35;animation:none!important}
+  button.pulse{animation:pulse 1.2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.7)}70%{box-shadow:0 0 0 14px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+  .full{width:100%;display:block}
+
+  .mhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+  .mhead b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rec{color:var(--bad);font-size:13px;white-space:nowrap}
+  .rec::before{content:"● ";animation:blink 1.4s infinite}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-bottom:10px}
+  .stats div{background:var(--bg);border-radius:10px;padding:8px 2px}
+  .stats b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+  .stats span{font-size:11px;color:var(--mute)}
+  .hint{font-size:13px;color:var(--mute);line-height:1.5;margin:8px 0 0}
+  .hint.bad{color:#fca5a5}
+
   .info{font-size:13px;color:var(--mute);line-height:1.6}
   .info b{color:var(--txt);font-weight:500}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .item{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:12px;padding:10px 12px}
+  .item .grow{flex:1;min-width:0}
+  .item .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .s{font-size:12px;color:var(--mute);margin-top:2px}
+  .x{background:transparent;color:var(--mute);font-size:20px;padding:4px 8px;flex:0 0 auto}
+  .empty{font-size:13px;color:var(--mute)}
   details{font-size:12px}
   summary{cursor:pointer;color:var(--mute);font-size:13px}
   #log{font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto;margin:8px 0 0;color:#cbd5e1}
   .warnbox{background:#422006;border:1px solid #a16207;color:#fde68a;border-radius:12px;padding:12px;font-size:14px;margin-bottom:12px;display:none}
+
+  .modal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+  .modal[hidden]{display:none}
+  .sheet{background:var(--card);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));max-height:94vh;overflow:auto}
+  .sheet h3{margin:0 0 14px;font-size:19px}
+  label{display:block;font-size:13px;color:var(--mute);margin:12px 0 5px}
+  input,textarea{width:100%;font:inherit;font-size:16px;color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+  textarea{min-height:90px;resize:vertical}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;background:var(--bg);border-radius:12px;padding:12px}
+  .kv span{color:var(--mute)} .kv b{font-weight:600;font-variant-numeric:tabular-nums;word-break:break-word}
+  .kv b.hot{color:var(--bad)}
+  .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .thumbs div{position:relative;width:92px;height:92px}
+  .thumbs img{width:100%;height:100%;object-fit:cover;border-radius:10px}
+  .thumbs button{position:absolute;top:-6px;right:-6px;width:26px;height:26px;padding:0;border-radius:50%;background:var(--bad);color:#fff;font-size:15px;line-height:26px}
+  .file{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--line);border-radius:12px;padding:13px;font-weight:600;cursor:pointer;margin-top:4px;color:var(--txt)}
+  .file input{display:none}
 </style>
 </head>
 <body>
@@ -67,11 +109,32 @@
 
   <div id="support" class="warnbox"></div>
 
+  <!-- Mesure -->
   <section id="mainCard" class="card main">
     <div class="lbl">Concentration</div>
     <div id="conc" class="conc idle">—</div>
     <div class="unit" id="unit"></div>
     <div id="trigger" class="trigger">Gâchette : <b>—</b></div>
+  </section>
+
+  <!-- Surveillance -->
+  <section class="card" id="missionCard">
+    <div id="missionIdle">
+      <button id="btnStart" class="go full">Commencer la surveillance</button>
+      <p class="hint" id="startHint"></p>
+    </div>
+    <div id="missionActive" hidden>
+      <div class="mhead"><b id="mName"></b><span class="rec">Surveillance</span></div>
+      <div class="stats">
+        <div><b id="sDur">0:00</b><span>Durée</span></div>
+        <div><b id="sDist">0 m</b><span>Distance</span></div>
+        <div><b id="sAlarms">0</b><span>Alarmes</span></div>
+        <div><b id="sIndices">0</b><span>Indices</span></div>
+      </div>
+      <button id="btnIndice" class="danger full" disabled>Indice</button>
+      <p class="hint" id="gpsHint">GPS : en attente…</p>
+      <div class="btns" style="margin-bottom:0"><button id="btnStop" class="sec">Terminer la mission</button></div>
+    </div>
   </section>
 
   <div class="grid">
@@ -92,132 +155,285 @@
     <canvas id="chart"></canvas>
   </section>
 
+  <!-- Connexion -->
   <div class="btns">
     <button id="btnConnect">Connecter</button>
     <button id="btnDisconnect" class="sec" disabled>Déconnecter</button>
   </div>
-  <div class="btns" style="margin-top:-4px">
-    <button id="btnAll" class="sec">Voir tous les appareils</button>
-    <button id="btnDemo" class="sec">Démo</button>
-  </div>
 
-  <section class="card info" id="devinfo">Aucun appareil.</section>
+  <section class="card info" id="devinfo">Aucun appareil connecté.</section>
+
+  <section class="card">
+    <h2>Appareils déjà connectés</h2>
+    <div class="list" id="devList"></div>
+  </section>
+
+  <section class="card">
+    <h2>Missions</h2>
+    <div class="list" id="missionList"></div>
+  </section>
 
   <section class="card">
     <details>
       <summary>Journal</summary>
       <div id="log"></div>
     </details>
+    <div class="btns" style="margin-bottom:0"><button id="btnDemo" class="sec small">Mode démo</button></div>
   </section>
 </main>
+
+<!-- Démarrage de mission -->
+<div class="modal" id="dlgStart" hidden>
+  <div class="sheet">
+    <h3>Nouvelle surveillance</h3>
+    <label for="fName">Nom de la mission</label>
+    <input id="fName" placeholder="Rue, secteur, n° d’intervention…">
+    <label for="fOp">Opérateur</label>
+    <input id="fOp" placeholder="Nom de l’opérateur">
+    <label for="fThr">Seuil d’alarme (<span class="u"></span>)</label>
+    <input id="fThr" type="number" inputmode="numeric" min="0" placeholder="Vide = alarme du Gazoscan">
+    <p class="hint">Un dépassement est détecté quand le Gazoscan signale une alarme, ou quand la concentration atteint le seuil s’il est renseigné.</p>
+    <div class="btns"><button class="sec" data-close>Annuler</button><button class="go" id="btnStartOk">Démarrer</button></div>
+  </div>
+</div>
+
+<!-- Indice -->
+<div class="modal" id="dlgIndice" hidden>
+  <div class="sheet">
+    <h3 id="iTitle">Indice</h3>
+    <div class="kv">
+      <span>Heure</span><b id="iTime"></b>
+      <span>Concentration</span><b id="iConc" class="hot"></b>
+      <span>Position</span><b id="iPos"></b>
+    </div>
+    <div class="btns"><button class="sec small" id="btnPosNow">Utiliser ma position actuelle</button></div>
+    <label for="iNote">Annotation</label>
+    <textarea id="iNote" placeholder="Description, repère, type d’ouvrage…"></textarea>
+    <label>Photos</label>
+    <label class="file">📷 Ajouter une photo<input id="iPhoto" type="file" accept="image/*" capture="environment"></label>
+    <div class="thumbs" id="iThumbs"></div>
+    <div class="btns"><button class="sec" data-close>Annuler</button><button class="danger" id="btnIndiceOk">Enregistrer l’indice</button></div>
+  </div>
+</div>
+
+<!-- Rapport -->
+<div class="modal" id="dlgReport" hidden>
+  <div class="sheet">
+    <h3>Rapport PDF</h3>
+    <p class="info" id="rInfo"></p>
+    <div class="btns"><button id="btnShare">Envoyer…</button><button class="sec" id="btnDownload">Télécharger</button></div>
+    <div class="btns"><button class="sec" data-close>Fermer</button></div>
+  </div>
+</div>
 
 <script>
 /* =====================================================================
    Paramètres repris de Gazoscan.cs
    ===================================================================== */
-// Service "Transparent UART" Microchip (UUID se terminant par …e455 dans le C#)
-const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
-const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616'; // notify : trames $…
-const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3'; // write  : commandes
-const NAME_PREFIXES = ['Gazoscan', 'GAZOSCAN', 'gazoscan', 'GazoScan'];
-const UNIT = 'ppm·m';            // unité affichée (à adapter)
-const TRIGGER_TIMEOUT_MS = 1000; // sans trame depuis 1 s => gâchette relâchée
+const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';  // Transparent UART Microchip (…e455)
+const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616';  // notify : trames $…
+const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';  // write  : commandes
+const NAME_PREFIXES = ['G', 'g'];  // (1) seuls les appareils dont le nom commence par G
+const UNIT = 'ppm·m';              // unité affichée (à adapter)
+const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
 const HISTORY_MS = 60000;
+const ALARM_GAP_MS = 3000;         // au-delà, un nouveau dépassement compte comme une nouvelle alarme
 
 /* =====================================================================
-   État
+   Outils
    ===================================================================== */
 const $ = id => document.getElementById(id);
-let device = null, measureChar = null, sendChar = null;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => n === null || n === undefined ? '—' : n.toLocaleString('fr-FR');
+const fmtDate = t => new Date(t).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const fmtTime = t => new Date(t).toLocaleTimeString('fr-FR');
+const fmtDur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h} h ${String(m).padStart(2,'0')}` : `${m}:${String(s % 60).padStart(2,'0')}`; };
+const fmtDurLong = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return (h ? h + ' h ' : '') + m + ' min ' + (s % 60) + ' s'; };
+const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(2).replace('.', ',') + ' km';
+const fmtPos = p => p ? `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}` : 'indisponible';
+const mapUrl = p => `https://www.google.com/maps?q=${p.lat.toFixed(6)},${p.lon.toFixed(6)}`;
+function hav(a, b) {
+  const R = 6371000, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+const trackDist = tr => tr.reduce((d, p, i) => i ? d + hav(tr[i - 1], p) : 0, 0);
+
+function log(msg) {
+  const el = $('log');
+  el.textContent = `[${fmtTime(Date.now())}] ${msg}\n` + el.textContent.split('\n').slice(0, 120).join('\n');
+}
+function openModal(id) { $(id).hidden = false; }
+function closeModal(id) { $(id).hidden = true; }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeModal(b.closest('.modal').id));
+
+/* =====================================================================
+   Stockage : appareils (localStorage) et missions (IndexedDB)
+   ===================================================================== */
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+const db = (() => {
+  let p;
+  const open = () => p ||= new Promise((res, rej) => {
+    const r = indexedDB.open('gazoscan', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('missions', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  const tx = async (mode, fn) => {
+    const d = await open();
+    return new Promise((res, rej) => {
+      const t = d.transaction('missions', mode), r = fn(t.objectStore('missions'));
+      t.oncomplete = () => res(r && r.result);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  return {
+    put: m => tx('readwrite', s => s.put(m)),
+    get: id => tx('readonly', s => s.get(id)),
+    all: () => tx('readonly', s => s.getAll()),
+    del: id => tx('readwrite', s => s.delete(id))
+  };
+})();
+
+/* =====================================================================
+   État BLE
+   ===================================================================== */
+let device = null, measureChar = null, sendChar = null, devInfo = null;
 let userDisconnect = false, reconnectTimer = null, reconnectDelay = 1000;
 let rxBuffer = '', flushTimer = null;
 let lastFrame = 0, last = null, history = [];
-let demoTimer = null, wakeLock = null;
+let demoTimer = null, wakeLock = null, bleState = 'idle';
 
 $('unit').textContent = UNIT;
+document.querySelectorAll('.u').forEach(e => e.textContent = UNIT);
 for (let i = 0; i < 12; i++) $('bars').appendChild(document.createElement('i'));
 
-function log(msg) {
-  const t = new Date().toLocaleTimeString('fr-FR');
-  const el = $('log');
-  el.textContent = `[${t}] ${msg}\n` + el.textContent.split('\n').slice(0, 80).join('\n');
-}
-
-const STATES = {
-  idle: 'Déconnecté', searching: 'Recherche…', connecting: 'Connexion…',
-  connected: 'Connecté', reconnecting: 'Reconnexion…', failed: 'Échec', demo: 'Démo'
-};
+const STATES = { idle: 'Déconnecté', searching: 'Recherche…', connecting: 'Connexion…',
+  connected: 'Connecté', reconnecting: 'Reconnexion…', failed: 'Échec', demo: 'Démo' };
+const isBusy = () => bleState !== 'idle' && bleState !== 'failed';
+const isLive = () => bleState === 'connected' || bleState === 'demo';
 function setState(s) {
+  bleState = s;
   const el = $('state');
   el.className = 'pill ' + (s === 'demo' ? 'connected' : s);
   el.textContent = STATES[s] || s;
-  const busy = s !== 'idle' && s !== 'failed';
-  $('btnConnect').disabled = busy;
-  $('btnAll').disabled = busy;
-  $('btnDisconnect').disabled = !busy;
-  $('btnDemo').textContent = s === 'demo' ? 'Arrêter démo' : 'Démo';
-  $('btnDemo').disabled = busy && s !== 'demo';
+  $('btnConnect').disabled = isBusy() || !navigator.bluetooth;
+  $('btnDisconnect').disabled = !isBusy();
+  $('btnDemo').textContent = s === 'demo' ? 'Arrêter la démo' : 'Mode démo';
+  $('btnDemo').disabled = isBusy() && s !== 'demo';
+  document.querySelectorAll('[data-dev]').forEach(b => b.disabled = isBusy() || !navigator.bluetooth);
+  renderMission();
 }
 
-/* =====================================================================
-   Support navigateur
-   ===================================================================== */
 (function checkSupport() {
   let msg = '';
-  if (!window.isSecureContext) msg = 'Cette page doit être servie en HTTPS (ou localhost) pour utiliser le Bluetooth.';
+  if (!window.isSecureContext) msg = 'Cette page doit être servie en HTTPS pour utiliser le Bluetooth et le GPS.';
   else if (!navigator.bluetooth) msg = 'Web Bluetooth non disponible. Utilisez Chrome, Edge ou Samsung Internet sur Android (pas Firefox, pas iPhone).';
-  if (msg) { $('support').textContent = msg; $('support').style.display = 'block'; $('btnConnect').disabled = $('btnAll').disabled = true; }
+  if (msg) { $('support').textContent = msg; $('support').style.display = 'block'; }
 })();
+
+/* =====================================================================
+   (2) Historique des appareils connectés
+   ===================================================================== */
+function rememberDevice(extra) {
+  if (!device) return;
+  const list = store.get('gz_devices', {});
+  const e = list[device.id] || { id: device.id, count: 0 };
+  e.name = device.name || e.name || '(sans nom)';
+  if (extra) Object.assign(e, extra);
+  else { e.last = Date.now(); e.count = (e.count || 0) + 1; }
+  list[device.id] = e;
+  store.set('gz_devices', list);
+  renderDevices();
+}
+function renderDevices() {
+  const list = Object.values(store.get('gz_devices', {})).sort((a, b) => b.last - a.last);
+  const el = $('devList');
+  if (!list.length) { el.innerHTML = '<div class="empty">Aucun appareil pour l’instant.</div>'; return; }
+  el.innerHTML = list.map(d => `
+    <div class="item">
+      <div class="grow">
+        <div class="t">${esc(d.name)}</div>
+        <div class="s">Dernière connexion : ${fmtDate(d.last)}${d.count ? ` · ${d.count} connexion${d.count > 1 ? 's' : ''}` : ''}${d.fw ? ` · FW ${esc(d.fw)}` : ''}</div>
+      </div>
+      <button class="small" data-dev="${esc(d.id)}">Connecter</button>
+      <button class="x" data-forget="${esc(d.id)}" title="Oublier">×</button>
+    </div>`).join('');
+  el.querySelectorAll('[data-dev]').forEach(b => {
+    b.disabled = isBusy() || !navigator.bluetooth;
+    b.onclick = () => connectKnown(store.get('gz_devices', {})[b.dataset.dev]);
+  });
+  el.querySelectorAll('[data-forget]').forEach(b => b.onclick = () => {
+    const l = store.get('gz_devices', {}); delete l[b.dataset.forget]; store.set('gz_devices', l); renderDevices();
+  });
+}
 
 /* =====================================================================
    Connexion BLE
    ===================================================================== */
-async function requestDevice(acceptAll) {
-  const optionalServices = [SERVICE_UUID, 'device_information'];
-  const opts = acceptAll
-    ? { acceptAllDevices: true, optionalServices }
-    : { filters: [{ services: [SERVICE_UUID] }, ...NAME_PREFIXES.map(namePrefix => ({ namePrefix }))], optionalServices };
+const optionalServices = [SERVICE_UUID, 'device_information'];
+
+async function requestDevice(filters) {
   setState('searching');
   try {
-    device = await navigator.bluetooth.requestDevice(opts);
+    useDevice(await navigator.bluetooth.requestDevice({ filters, optionalServices }));
   } catch (e) {
     log('Sélection annulée : ' + e.message);
     setState('idle');
-    return;
   }
-  log(`Appareil choisi : ${device.name || '(sans nom)'} [${device.id}]`);
+}
+
+async function connectKnown(entry) {
+  if (!entry) return;
+  // Le navigateur se souvient-il de l'autorisation ? -> connexion directe, sans sélecteur
+  if (navigator.bluetooth.getDevices) {
+    try {
+      const d = (await navigator.bluetooth.getDevices()).find(x => x.id === entry.id);
+      if (d) { log('Appareil autorisé retrouvé, connexion directe.'); useDevice(d); return; }
+    } catch {}
+  }
+  // Sinon : sélecteur limité à cet appareil
+  requestDevice([{ name: entry.name }]);
+}
+
+function useDevice(d) {
+  device = d;
+  log(`Appareil : ${device.name || '(sans nom)'} [${device.id}]`);
   device.removeEventListener('gattserverdisconnected', onDisconnected);
   device.addEventListener('gattserverdisconnected', onDisconnected);
   userDisconnect = false;
   reconnectDelay = 1000;
-  await connect();
+  measureChar = null;
+  connect();
 }
 
-function withTimeout(p, ms, what) {
-  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ' : délai dépassé')), ms))]);
-}
+const withTimeout = (p, ms, what) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ' : délai dépassé')), ms))]);
 
 async function connect() {
   if (!device) return;
   clearTimeout(reconnectTimer);
-  setState(measureChar ? 'reconnecting' : 'connecting');
+  const first = !measureChar;
+  setState(first ? 'connecting' : 'reconnecting');
   try {
     const server = await withTimeout(device.gatt.connect(), 15000, 'Connexion');
-    log('GATT connecté.');
     const service = await withTimeout(server.getPrimaryService(SERVICE_UUID), 8000, 'Service');
-
     measureChar = await service.getCharacteristic(MEASURE_UUID);
     measureChar.removeEventListener('characteristicvaluechanged', onMeasure);
-    measureChar.addEventListener('characteristicvaluechanged', onMeasure); // abonnement AVANT le CCCD
+    measureChar.addEventListener('characteristicvaluechanged', onMeasure);
     await measureChar.startNotifications();
-    log('Notifications mesure actives.');
-
-    try { sendChar = await service.getCharacteristic(SENDING_UUID); log('Canal d’envoi trouvé.'); }
-    catch { sendChar = null; log('Canal d’envoi introuvable.'); }
-
+    try { sendChar = await service.getCharacteristic(SENDING_UUID); } catch { sendChar = null; }
+    log('Connecté, notifications actives.');
     rxBuffer = '';
     reconnectDelay = 1000;
     setState('connected');
+    rememberDevice();
     keepAwake();
     readDeviceInfo(server);
   } catch (e) {
@@ -232,7 +448,6 @@ function onDisconnected() {
   if (userDisconnect) { setState('idle'); return; }
   scheduleReconnect();
 }
-
 function scheduleReconnect() {
   setState('reconnecting');
   clearTimeout(reconnectTimer);
@@ -240,7 +455,6 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(connect, reconnectDelay);
   reconnectDelay = Math.min(reconnectDelay * 2, 15000);
 }
-
 async function disconnect() {
   userDisconnect = true;
   clearTimeout(reconnectTimer);
@@ -248,12 +462,12 @@ async function disconnect() {
   try { if (measureChar) await measureChar.stopNotifications(); } catch {}
   try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
   measureChar = sendChar = null;
-  releaseWake();
+  if (!mission) releaseWake();
   setState('idle');
 }
 
 async function readDeviceInfo(server) {
-  const info = { name: device.name || '(sans nom)' };
+  const info = { Appareil: device.name || '(sans nom)' };
   try {
     const s = await server.getPrimaryService('device_information');
     const map = { manufacturer_name_string: 'Fabricant', model_number_string: 'Modèle',
@@ -266,50 +480,39 @@ async function readDeviceInfo(server) {
     }
   } catch { log('Service Device Information non lisible.'); }
   showInfo(info);
+  if (info.Firmware) rememberDevice({ fw: info.Firmware });
 }
-
 function showInfo(info) {
-  $('devinfo').innerHTML = Object.entries(info)
-    .map(([k, v]) => `${k === 'name' ? 'Appareil' : k} : <b>${String(v).replace(/[<>&]/g, '')}</b>`).join('<br>');
+  devInfo = info;
+  $('devinfo').innerHTML = Object.entries(info).map(([k, v]) => `${esc(k)} : <b>${esc(v)}</b>`).join('<br>');
+  if (mission) { mission.device = info; scheduleSave(); }
 }
 
 /* =====================================================================
-   Réception et décodage des trames
-   Format (cf. NewInformationLine) : $CCCCC,MMMMM,AAAAA,IIIII
-     C = concentration, M = max, A = alarme, I = intensité lumineuse
-   Les trames peuvent arriver découpées (MTU 20 octets) : on les reconstitue.
+   Réception et décodage des trames : $CCCCC,MMMMM,AAAAA,IIIII
+   (concentration, max, alarme, intensité — cf. NewInformationLine)
    ===================================================================== */
 function onMeasure(ev) {
   const dv = ev.target.value;
   feed(new TextDecoder('latin1').decode(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)));
 }
-
 function feed(txt) {
   txt = txt.replace(/\0/g, '');
   if (!txt) return;
-  if (!rxBuffer && txt[0] !== '$') {          // réponse texte (mode test / configuration)
-    log('Message : ' + txt.trim());
-    return;
-  }
+  if (!rxBuffer && txt[0] !== '$') { log('Message : ' + txt.trim()); return; }
   rxBuffer += txt;
   clearTimeout(flushTimer);
-
-  // Tout segment suivi d'un autre '$' est complet
   const parts = rxBuffer.split('$');
   rxBuffer = '$' + parts.pop();
   for (const p of parts) if (p) parseFrame(p);
-
-  // Le dernier segment est complet s'il a sa longueur ou une fin de ligne
   const tail = rxBuffer.slice(1);
   if (tail.length >= 23 || /[\r\n]/.test(tail)) { parseFrame(tail); rxBuffer = ''; }
   else flushTimer = setTimeout(() => { if (rxBuffer.length > 11) parseFrame(rxBuffer.slice(1)); rxBuffer = ''; }, 150);
 }
-
 function field(s, start) {
   const v = s.substr(start, 5);
   return /^\s*-?\d+\s*$/.test(v) ? parseInt(v, 10) : null;
 }
-
 function intensityLevel(i) {
   let lvl = 12, color = 2;
   for (const th of [52000, 25600, 12800, 6400, 3200]) if (i < th) lvl--;
@@ -317,71 +520,63 @@ function intensityLevel(i) {
   for (const th of [800, 400, 200]) if (i < th) lvl--;
   if (i < 100) { lvl--; color--; }
   if (i < 50) lvl--;
-  return { lvl, color };   // color : 2 = bon, 1 = moyen, 0 = faible
+  return { lvl, color };
 }
-
 function parseFrame(seg) {
   seg = seg.replace(/[\r\n]/g, '');
   if (seg.length < 10) { log('Trame incomplète : $' + seg); return; }
-  const f = {
-    conc: field(seg, 0), max: field(seg, 6),
-    alarm: field(seg, 12), intens: field(seg, 18), t: Date.now()
-  };
+  const f = { conc: field(seg, 0), max: field(seg, 6), alarm: field(seg, 12), intens: field(seg, 18), t: Date.now() };
   if (f.conc === null) { log('Trame invalide : $' + seg); return; }
   last = f;
   lastFrame = f.t;
   history.push({ t: f.t, v: f.conc });
   render();
+  missionOnFrame(f);
 }
 
 /* =====================================================================
-   Affichage
+   Affichage mesure
    ===================================================================== */
-const fmt = n => n === null || n === undefined ? '—' : n.toLocaleString('fr-FR');
-
+function isAlarmFrame(f) {
+  const thr = mission ? mission.threshold : null;
+  return (f.alarm > 0) || (thr > 0 && f.conc >= thr);
+}
 function render() {
   if (!last) return;
   const pressed = Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS;
-  const alarm = last.alarm > 0;
-
+  const alarm = isAlarmFrame(last);
   const c = $('conc');
   c.textContent = fmt(last.conc);
   c.className = 'conc ' + (alarm ? 'alarm' : last.conc > 0 ? 'pos' : 'zero') + (pressed ? '' : ' idle');
   $('mainCard').classList.toggle('alarm', alarm && pressed);
-
   $('max').innerHTML = `${fmt(last.max)} <small>${UNIT}</small>`;
   const a = $('alarm');
-  a.textContent = last.alarm === null ? 'Alarme —' : alarm ? `Alarme ${last.alarm}` : 'Pas d’alarme';
-  a.className = 'alarmbadge' + (alarm ? ' on' : '');
-
+  a.textContent = last.alarm === null ? 'Alarme —' : last.alarm > 0 ? `Alarme ${last.alarm}` : 'Pas d’alarme';
+  a.className = 'alarmbadge' + (last.alarm > 0 ? ' on' : '');
   if (last.intens !== null) {
     const { lvl, color } = intensityLevel(last.intens);
     $('intens').textContent = fmt(last.intens);
     const col = ['var(--bad)', 'var(--warn)', 'var(--ok)'][Math.max(0, color)];
-    [...$('bars').children].forEach((b, i) => {
-      b.style.height = (30 + i * 6) + '%';
-      b.style.background = i < lvl ? col : 'var(--line)';
-    });
+    [...$('bars').children].forEach((b, i) => { b.style.height = (30 + i * 6) + '%'; b.style.background = i < lvl ? col : 'var(--line)'; });
   }
 }
-
 function tick() {
-  const connected = $('state').classList.contains('connected');
-  const pressed = connected && last && Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS;
+  const live = isLive();
+  const pressed = live && last && Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS;
   const tr = $('trigger');
   tr.className = 'trigger' + (pressed ? ' on' : '');
-  tr.innerHTML = 'Gâchette : <b>' + (!connected ? '—' : pressed ? 'appuyée' : 'relâchée') + '</b>';
+  tr.innerHTML = 'Gâchette : <b>' + (!live ? '—' : pressed ? 'appuyée' : 'relâchée') + '</b>';
   if (last) {
     $('conc').classList.toggle('idle', !pressed);
-    $('mainCard').classList.toggle('alarm', !!(pressed && last.alarm > 0));
+    $('mainCard').classList.toggle('alarm', !!(pressed && isAlarmFrame(last)));
   }
+  if (mission) $('sDur').textContent = fmtDur(Date.now() - mission.start);
   drawChart();
 }
 setInterval(tick, 250);
 
 function drawChart() {
-  const cv = $('chart'), dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, h = cv.clientHeight;
+  const cv = $('chart'), dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -391,6 +586,12 @@ function drawChart() {
   const maxV = Math.max(10, ...history.map(p => p.v)) * 1.1;
   g.strokeStyle = '#334155'; g.lineWidth = 1;
   g.beginPath(); g.moveTo(0, h - 0.5); g.lineTo(w, h - 0.5); g.stroke();
+  const thr = mission && mission.threshold;
+  if (thr > 0 && thr < maxV) {
+    const y = h - 2 - thr / maxV * (h - 18);
+    g.strokeStyle = 'rgba(239,68,68,.6)'; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); g.setLineDash([]);
+  }
   g.fillStyle = '#94a3b8'; g.font = '11px system-ui';
   g.fillText(fmt(Math.round(maxV)), 4, 12);
   if (!history.length) return;
@@ -398,36 +599,621 @@ function drawChart() {
   let prev = null;
   for (const p of history) {
     const x = w - (now - p.t) / HISTORY_MS * w, y = h - 2 - p.v / maxV * (h - 18);
-    if (!prev || p.t - prev.t > 1500) g.moveTo(x, y); else g.lineTo(x, y);  // trou si gâchette relâchée
+    if (!prev || p.t - prev.t > 1500) g.moveTo(x, y); else g.lineTo(x, y);
     prev = p;
   }
   g.stroke();
 }
 
 /* =====================================================================
-   Écran allumé pendant la mesure
+   Écran allumé + alertes
    ===================================================================== */
 async function keepAwake() {
-  try { if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+  try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.onrelease = () => wakeLock = null; } } catch {}
 }
 function releaseWake() { try { wakeLock && wakeLock.release(); } catch {} wakeLock = null; }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && $('state').classList.contains('connected')) { wakeLock = null; keepAwake(); }
+  if (document.visibilityState === 'visible' && (isLive() || mission)) keepAwake();
 });
+let audioCtx = null;
+function unlockAudio() { try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch {} }
+function alertUser() {
+  try { navigator.vibrate && navigator.vibrate([250, 120, 250]); } catch {}
+  try {
+    if (!audioCtx) return;
+    [0, 0.3].forEach(d => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = 1400; g.gain.value = 0.25;
+      o.connect(g).connect(audioCtx.destination);
+      o.start(audioCtx.currentTime + d); o.stop(audioCtx.currentTime + d + 0.18);
+    });
+  } catch {}
+}
 
 /* =====================================================================
-   Démo (sans appareil) : fabrique des trames découpées en paquets de 20 octets
+   (3) Surveillance / mission
+   ===================================================================== */
+let mission = null, geoWatch = null, lastPos = null, saveTimer = null;
+
+function scheduleSave(now) {
+  clearTimeout(saveTimer);
+  const doSave = () => mission && db.put(mission).catch(e => log('Sauvegarde impossible : ' + e.message));
+  if (now) doSave(); else saveTimer = setTimeout(doSave, 2000);
+}
+
+$('btnStart').onclick = () => {
+  unlockAudio();
+  $('fName').value = '';
+  $('fOp').value = store.get('gz_operator', '');
+  $('fThr').value = store.get('gz_threshold', '');
+  openModal('dlgStart');
+};
+$('btnStartOk').onclick = () => {
+  const thr = parseInt($('fThr').value, 10);
+  store.set('gz_operator', $('fOp').value.trim());
+  store.set('gz_threshold', $('fThr').value.trim());
+  closeModal('dlgStart');
+  startMission($('fName').value.trim() || `Mission du ${fmtDate(Date.now())}`, $('fOp').value.trim(), thr > 0 ? thr : null);
+};
+
+function startMission(name, operator, threshold) {
+  mission = { id: 'M' + Date.now(), name, operator, threshold, unit: UNIT,
+    start: Date.now(), end: null, device: isLive() ? devInfo : null,
+    track: [], alarms: [], indices: [], maxConc: 0 };
+  store.set('gz_active', mission.id);
+  log('Surveillance démarrée : ' + name);
+  startGeo();
+  keepAwake();
+  renderMission();
+  scheduleSave(true);
+}
+
+function startGeo() {
+  if (!navigator.geolocation) { gpsHint('GPS indisponible sur ce navigateur.', true); return; }
+  gpsHint('GPS : recherche de la position…');
+  geoWatch = navigator.geolocation.watchPosition(p => {
+    lastPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy), t: Date.now() };
+    gpsHint(`GPS : ${fmtPos(lastPos)} (± ${lastPos.acc} m)`);
+    if (!mission) return;
+    const tr = mission.track, prev = tr[tr.length - 1];
+    if (lastPos.acc <= 50 && (!prev || hav(prev, lastPos) >= 5 || lastPos.t - prev.t >= 30000)) {
+      tr.push({ ...lastPos });
+      renderMission();
+      scheduleSave();
+    }
+  }, e => {
+    gpsHint(e.code === 1 ? 'GPS refusé : autorisez la localisation pour ce site dans Chrome.' : 'GPS : ' + e.message, true);
+  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
+}
+function stopGeo() { if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
+function gpsHint(t, bad) { const h = $('gpsHint'); h.textContent = t; h.className = 'hint' + (bad ? ' bad' : ''); }
+
+function missionOnFrame(f) {
+  if (!mission) return;
+  if (f.conc > mission.maxConc) mission.maxConc = f.conc;
+  if (!isAlarmFrame(f)) return;
+  const a = mission.alarms[mission.alarms.length - 1];
+  if (!a || f.t - a.lastT > ALARM_GAP_MS) {
+    mission.alarms.push({ n: mission.alarms.length + 1, t: f.t, lastT: f.t, conc: f.conc,
+      pos: lastPos ? { ...lastPos } : null, indice: null });
+    log(`Alarme n°${mission.alarms.length} : ${f.conc} ${UNIT}`);
+    alertUser();
+    scheduleSave(true);
+  } else {
+    a.lastT = f.t;
+    if (f.conc > a.conc) { a.conc = f.conc; if (lastPos) a.pos = { ...lastPos }; }
+    scheduleSave();
+  }
+  renderMission();
+}
+
+const pendingAlarm = () => {
+  const a = mission && mission.alarms[mission.alarms.length - 1];
+  return a && !a.indice ? a : null;
+};
+
+function renderMission() {
+  const on = !!mission;
+  $('missionIdle').hidden = on;
+  $('missionActive').hidden = !on;
+  $('startHint').textContent = isLive()
+    ? 'Enregistre le trajet GPS et les dépassements d’alarme, puis génère un rapport PDF.'
+    : 'Connecte le Gazoscan pour détecter les alarmes. Le trajet GPS est enregistré dans tous les cas.';
+  if (!on) return;
+  $('mName').textContent = mission.name;
+  $('sDist').textContent = fmtDist(trackDist(mission.track));
+  $('sAlarms').textContent = mission.alarms.length;
+  $('sIndices').textContent = mission.indices.length;
+  const a = pendingAlarm(), b = $('btnIndice');
+  b.disabled = !a;
+  b.classList.toggle('pulse', !!a);
+  b.textContent = a ? `Indice disponible : ${fmt(a.conc)} ${UNIT}` : 'Indice (en attente d’un dépassement)';
+}
+
+$('btnStop').onclick = async () => {
+  if (!confirm('Terminer la surveillance et générer le rapport ?')) return;
+  mission.end = Date.now();
+  stopGeo();
+  clearTimeout(saveTimer);
+  await db.put(mission);
+  store.del('gz_active');
+  const m = mission;
+  mission = null;
+  log('Surveillance terminée.');
+  if (!isLive()) releaseWake();
+  renderMission();
+  renderMissions();
+  showReport(m);
+};
+
+async function resumeMission() {
+  const id = store.get('gz_active', null);
+  if (!id) return;
+  try {
+    const m = await db.get(id);
+    if (m && !m.end) { mission = m; log('Surveillance en cours reprise.'); startGeo(); keepAwake(); renderMission(); }
+    else store.del('gz_active');
+  } catch {}
+}
+
+/* =====================================================================
+   (4)(5) Indice : annotation, position, concentration, photos
+   ===================================================================== */
+let indiceDraft = null;
+
+$('btnIndice').onclick = () => {
+  const a = pendingAlarm();
+  if (!a) return;
+  indiceDraft = { alarm: a, pos: a.pos || (lastPos ? { ...lastPos } : null), photos: [] };
+  $('iTitle').textContent = `Indice n°${mission.indices.length + 1}`;
+  $('iTime').textContent = fmtTime(a.t);
+  $('iConc').textContent = `${fmt(a.conc)} ${UNIT}`;
+  $('iNote').value = '';
+  renderDraft();
+  openModal('dlgIndice');
+};
+$('btnPosNow').onclick = () => {
+  if (!lastPos) { alert('Position GPS pas encore disponible.'); return; }
+  indiceDraft.pos = { ...lastPos };
+  renderDraft();
+};
+function renderDraft() {
+  const p = indiceDraft.pos;
+  $('iPos').innerHTML = p ? `${fmtPos(p)}<br><span style="color:var(--mute);font-weight:400">± ${p.acc} m</span>` : 'indisponible';
+  $('iThumbs').innerHTML = indiceDraft.photos.map((ph, i) =>
+    `<div><img src="${ph.data}" alt=""><button data-rm="${i}">×</button></div>`).join('');
+  $('iThumbs').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { indiceDraft.photos.splice(+b.dataset.rm, 1); renderDraft(); });
+}
+$('iPhoto').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try { indiceDraft.photos.push(await fileToJpeg(file)); renderDraft(); }
+  catch (err) { alert('Photo illisible : ' + err.message); }
+};
+async function fileToJpeg(file, max = 1280) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('format non pris en charge')); i.src = url; });
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+    return { data: cv.toDataURL('image/jpeg', 0.8), w, h };
+  } finally { URL.revokeObjectURL(url); }
+}
+$('btnIndiceOk').onclick = () => {
+  const a = indiceDraft.alarm;
+  const ind = { n: mission.indices.length + 1, t: a.t, conc: a.conc, pos: indiceDraft.pos,
+    note: $('iNote').value.trim(), photos: indiceDraft.photos, alarm: a.n };
+  mission.indices.push(ind);
+  a.indice = ind.n;
+  indiceDraft = null;
+  closeModal('dlgIndice');
+  log(`Indice n°${ind.n} enregistré.`);
+  renderMission();
+  scheduleSave(true);
+};
+
+/* =====================================================================
+   Liste des missions
+   ===================================================================== */
+async function renderMissions() {
+  let list = [];
+  try { list = (await db.all()).filter(m => m.end).sort((a, b) => b.start - a.start); } catch {}
+  const el = $('missionList');
+  if (!list.length) { el.innerHTML = '<div class="empty">Aucune mission terminée.</div>'; return; }
+  el.innerHTML = list.map(m => `
+    <div class="item">
+      <div class="grow">
+        <div class="t">${esc(m.name)}</div>
+        <div class="s">${fmtDate(m.start)} · ${fmtDur(m.end - m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)</div>
+      </div>
+      <button class="small" data-pdf="${m.id}">PDF</button>
+      <button class="x" data-delm="${m.id}" title="Supprimer">×</button>
+    </div>`).join('');
+  el.querySelectorAll('[data-pdf]').forEach(b => b.onclick = async () => showReport(await db.get(b.dataset.pdf)));
+  el.querySelectorAll('[data-delm]').forEach(b => b.onclick = async () => {
+    if (!confirm('Supprimer définitivement cette mission et ses photos ?')) return;
+    await db.del(b.dataset.delm); renderMissions();
+  });
+}
+
+/* =====================================================================
+   (6)(7) Rapport PDF : télécharger ou envoyer
+   ===================================================================== */
+let report = null;
+function reportName(m) {
+  const d = new Date(m.start), p = n => String(n).padStart(2, '0');
+  const slug = m.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
+  return `Rapport_Gazoscan_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}h${p(d.getMinutes())}${slug ? '_' + slug : ''}.pdf`;
+}
+function showReport(m) {
+  try {
+    const bytes = buildReport(m);
+    report = { file: new File([bytes], reportName(m), { type: 'application/pdf' }), m };
+    $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>${fmtDate(m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)<br>${Math.max(1, Math.round(bytes.length / 1024))} Ko`;
+    $('btnShare').disabled = !(navigator.canShare && navigator.canShare({ files: [report.file] }));
+    openModal('dlgReport');
+  } catch (e) {
+    log('Erreur rapport : ' + e.message);
+    alert('Impossible de générer le rapport : ' + e.message);
+  }
+}
+$('btnDownload').onclick = () => {
+  const url = URL.createObjectURL(report.file);
+  const a = document.createElement('a');
+  a.href = url; a.download = report.file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+};
+$('btnShare').onclick = async () => {
+  try {
+    await navigator.share({ files: [report.file], title: 'Rapport Gazoscan – ' + report.m.name,
+      text: `Rapport de surveillance Gazoscan : ${report.m.name} (${fmtDate(report.m.start)})` });
+  } catch (e) { if (e.name !== 'AbortError') log('Partage impossible : ' + e.message); }
+};
+
+/* ---------- Mini générateur PDF (texte, dessins, photos JPEG, liens) ---------- */
+const PDF = (() => {
+  const HR = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+  const HB = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+  const WIN = { 0x20AC:0x80, 0x201A:0x82, 0x201E:0x84, 0x2026:0x85, 0x2018:0x91, 0x2019:0x92, 0x201C:0x93, 0x201D:0x94,
+    0x2022:0x95, 0x2013:0x96, 0x2014:0x97, 0x0152:0x8C, 0x0153:0x9C, 0x202F:0x20, 0x00A0:0x20, 0x2009:0x20, 0x2265:0x3E };
+  const n = v => (Math.round(v * 100) / 100).toString();
+  const encChar = ch => { const c = ch.codePointAt(0); return c < 256 && c !== 0xA0 ? c : (WIN[c] ?? 0x3F); };
+  const enc = s => [...String(s)].map(ch => { const c = encChar(ch), t = String.fromCharCode(c); return c === 0x28 || c === 0x29 || c === 0x5C ? '\\' + t : t; }).join('');
+  const charW = (ch, bold) => {
+    let c = ch.codePointAt(0);
+    if (c === 0x202F || c === 0xA0 || c === 0x2009) c = 32;
+    if (c < 32 || c > 126) {
+      const base = ch.normalize('NFD').codePointAt(0);
+      if (base >= 32 && base <= 126) c = base;
+      else return { 0xB7: 278, 0xB0: 400, 0x2019: bold ? 278 : 222, 0x2014: 1000, 0x2013: 556, 0x2026: 1000 }[c] ?? 556;
+    }
+    return (bold ? HB : HR)[c - 32];
+  };
+  const width = (s, size, bold) => [...String(s)].reduce((w, ch) => w + charW(ch, bold), 0) * size / 1000;
+  const bin = s => { const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xFF; return b; };
+  const rgb = c => c.map(v => n(v / 255)).join(' ');
+
+  function create() {
+    const W = 595.28, H = 841.89, pages = [], images = [];
+    let cur = null;
+    return {
+      W, H, pages, width,
+      addPage() { cur = { ops: [], links: [] }; pages.push(cur); return cur; },
+      setPage(p) { cur = p; },
+      text(x, y, s, o = {}) {
+        const { size = 10, bold = false, color = [15, 23, 42] } = o;
+        cur.ops.push(`BT /${bold ? 'F2' : 'F1'} ${size} Tf ${rgb(color)} rg ${n(x)} ${n(H - y)} Td (${enc(s)}) Tj ET`);
+      },
+      rect(x, y, w, h, o = {}) {
+        const { fill, stroke, lw = 1 } = o;
+        cur.ops.push(`${fill ? rgb(fill) + ' rg ' : ''}${stroke ? rgb(stroke) + ' RG ' + n(lw) + ' w ' : ''}${n(x)} ${n(H - y - h)} ${n(w)} ${n(h)} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`);
+      },
+      line(pts, color, lw = 1) {
+        if (pts.length < 2) return;
+        cur.ops.push(`${rgb(color)} RG ${n(lw)} w 1 J 1 j ` + pts.map((p, i) => `${n(p[0])} ${n(H - p[1])} ${i ? 'l' : 'm'}`).join(' ') + ' S');
+      },
+      poly(pts, fill) { cur.ops.push(`${rgb(fill)} rg ` + pts.map((p, i) => `${n(p[0])} ${n(H - p[1])} ${i ? 'l' : 'm'}`).join(' ') + ' h f'); },
+      circle(cx, cy, r, o = {}) {
+        const { fill, stroke, lw = 1 } = o, k = 0.5523 * r, y = H - cy;
+        cur.ops.push(`${fill ? rgb(fill) + ' rg ' : ''}${stroke ? rgb(stroke) + ' RG ' + n(lw) + ' w ' : ''}` +
+          `${n(cx + r)} ${n(y)} m ${n(cx + r)} ${n(y + k)} ${n(cx + k)} ${n(y + r)} ${n(cx)} ${n(y + r)} c ` +
+          `${n(cx - k)} ${n(y + r)} ${n(cx - r)} ${n(y + k)} ${n(cx - r)} ${n(y)} c ` +
+          `${n(cx - r)} ${n(y - k)} ${n(cx - k)} ${n(y - r)} ${n(cx)} ${n(y - r)} c ` +
+          `${n(cx + k)} ${n(y - r)} ${n(cx + r)} ${n(y - k)} ${n(cx + r)} ${n(y)} c ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`);
+      },
+      jpeg(dataUrl, w, h) {
+        const im = { name: 'Im' + (images.length + 1), bytes: bin(atob(dataUrl.split(',')[1])), w, h };
+        images.push(im); return im;
+      },
+      image(im, x, y, w, h) { cur.ops.push(`q ${n(w)} 0 0 ${n(h)} ${n(x)} ${n(H - y - h)} cm /${im.name} Do Q`); },
+      link(x, y, w, h, url) { cur.links.push({ x, y, w, h, url }); },
+      build(title) {
+        const chunks = []; let len = 0; const offs = [];
+        const push = s => { const b = typeof s === 'string' ? bin(s) : s; chunks.push(b); len += b.length; };
+        let id = 5;
+        images.forEach(im => im.id = id++);
+        pages.forEach(p => { p.id = id++; p.cid = id++; p.ann = p.links.map(() => id++); });
+        const infoId = id, total = id;
+        const obj = (oid, parts) => { offs[oid] = len; push(`${oid} 0 obj\n`); [].concat(parts).forEach(push); push('\nendobj\n'); };
+        push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+        obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+        obj(2, `<< /Type /Pages /Kids [${pages.map(p => p.id + ' 0 R').join(' ')}] /Count ${pages.length} >>`);
+        obj(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+        obj(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+        images.forEach(im => obj(im.id, [`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`, im.bytes, '\nendstream']));
+        const xo = images.length ? `/XObject << ${images.map(im => `/${im.name} ${im.id} 0 R`).join(' ')} >>` : '';
+        pages.forEach(p => {
+          obj(p.id, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${n(W)} ${n(H)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> ${xo} >> /Contents ${p.cid} 0 R${p.ann.length ? ` /Annots [${p.ann.map(a => a + ' 0 R').join(' ')}]` : ''} >>`);
+          const content = p.ops.join('\n');
+          obj(p.cid, [`<< /Length ${content.length} >>\nstream\n`, content, '\nendstream']);
+          p.links.forEach((l, i) => obj(p.ann[i], `<< /Type /Annot /Subtype /Link /Rect [${n(l.x)} ${n(H - l.y - l.h)} ${n(l.x + l.w)} ${n(H - l.y)}] /Border [0 0 0] /A << /S /URI /URI (${enc(l.url)}) >> >>`));
+        });
+        obj(infoId, `<< /Title (${enc(title)}) /Producer (Gazoscan Web) >>`);
+        const xref = len;
+        let x = `xref\n0 ${total + 1}\n0000000000 65535 f \n`;
+        for (let i = 1; i <= total; i++) x += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
+        push(x);
+        push(`trailer\n<< /Size ${total + 1} /Root 1 0 R /Info ${infoId} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+        const out = new Uint8Array(len); let o = 0;
+        chunks.forEach(c => { out.set(c, o); o += c.length; });
+        return out;
+      }
+    };
+  }
+  return { create };
+})();
+
+/* ---------- Contenu du rapport ---------- */
+function buildReport(m) {
+  const d = PDF.create(), M = 40, PW = d.W - 2 * M;
+  const C = { ink: [15, 23, 42], mute: [100, 116, 139], line: [203, 213, 225], soft: [241, 245, 249],
+    navy: [15, 23, 42], blue: [2, 132, 199], red: [220, 38, 38], orange: [234, 88, 12], green: [22, 163, 74], white: [255, 255, 255] };
+  const unit = m.unit || UNIT;
+  let y = 0;
+
+  const newPage = () => {
+    d.addPage();
+    if (d.pages.length > 1) {
+      d.text(M, 28, 'Rapport de surveillance Gazoscan', { size: 8, bold: true, color: C.mute });
+      const t = m.name.length > 70 ? m.name.slice(0, 67) + '…' : m.name;
+      d.text(d.W - M - d.width(t, 8), 28, t, { size: 8, color: C.mute });
+      d.line([[M, 34], [d.W - M, 34]], C.line, 0.5);
+      y = 52;
+    }
+  };
+  const ensure = h => { if (y + h > d.H - 50) newPage(); };
+  const wrap = (s, w, size, bold) => {
+    const out = [];
+    String(s).split('\n').forEach(par => {
+      let line = '';
+      par.split(/\s+/).forEach(word => {
+        const t = line ? line + ' ' + word : word;
+        if (d.width(t, size, bold) <= w) line = t;
+        else {
+          if (line) out.push(line);
+          while (d.width(word, size, bold) > w) { let k = word.length; while (k > 1 && d.width(word.slice(0, k), size, bold) > w) k--; out.push(word.slice(0, k)); word = word.slice(k); }
+          line = word;
+        }
+      });
+      out.push(line);
+    });
+    return out;
+  };
+  const para = (s, o = {}) => {
+    const { size = 10, bold = false, color = C.ink, x = M, w = PW, lh = 1.4 } = o;
+    wrap(s, w, size, bold).forEach(l => { ensure(size * lh); d.text(x, y + size, l, { size, bold, color }); y += size * lh; });
+  };
+  const heading = s => { ensure(60); y += 14; d.text(M, y + 13, s, { size: 13, bold: true }); y += 20; d.line([[M, y], [d.W - M, y]], C.line, 0.8); y += 10; };
+
+  // ---- En-tête ----
+  newPage();
+  d.rect(0, 0, d.W, 96, { fill: C.navy });
+  d.text(M, 42, 'Rapport de surveillance Gazoscan', { size: 20, bold: true, color: C.white });
+  wrap(m.name, PW, 12, false).slice(0, 2).forEach((l, i) => d.text(M, 64 + i * 15, l, { size: 12, color: [203, 213, 225] }));
+  y = 116;
+
+  // ---- Synthèse ----
+  const track = m.track || [];
+  const dev = m.device || {};
+  const stats = [
+    ['Concentration max', `${fmt(m.maxConc || 0)} ${unit}`, m.alarms.length ? C.red : C.ink],
+    ['Alarmes', String(m.alarms.length), m.alarms.length ? C.red : C.ink],
+    ['Indices', String(m.indices.length), C.ink],
+    ['Distance', fmtDist(trackDist(track)), C.ink]
+  ];
+  const bw = (PW - 30) / 4;
+  stats.forEach(([k, v, col], i) => {
+    const x = M + i * (bw + 10);
+    d.rect(x, y, bw, 52, { fill: C.soft });
+    d.text(x + 10, y + 18, k, { size: 8, color: C.mute });
+    d.text(x + 10, y + 40, v, { size: 14, bold: true, color: col });
+  });
+  y += 70;
+
+  const rows = [
+    ['Mission', m.name],
+    ['Opérateur', m.operator || '—'],
+    ['Début', fmtDate(m.start)],
+    ['Fin', m.end ? fmtDate(m.end) : '—'],
+    ['Durée', m.end ? fmtDurLong(m.end - m.start) : '—'],
+    ['Appareil', dev.Appareil || '—'],
+  ];
+  if (dev.Fabricant || dev['Modèle']) rows.push(['Fabricant / modèle', [dev.Fabricant, dev['Modèle']].filter(Boolean).join(' / ')]);
+  if (dev.Firmware || dev.Logiciel) rows.push(['Firmware / logiciel', [dev.Firmware, dev.Logiciel].filter(Boolean).join(' / ')]);
+  rows.push(['Détection', m.threshold ? `Alarme du Gazoscan ou concentration >= ${fmt(m.threshold)} ${unit}` : 'Alarme du Gazoscan']);
+  rows.push(['Points GPS', String(track.length)]);
+  rows.forEach(([k, v], i) => {
+    const lines = wrap(v, PW - 150, 10, false);
+    const h = lines.length * 14 + 8;
+    ensure(h);
+    if (i % 2 === 0) d.rect(M, y, PW, h, { fill: C.soft });
+    d.text(M + 8, y + 15, k, { size: 9, color: C.mute });
+    lines.forEach((l, j) => d.text(M + 150, y + 15 + j * 14, l, { size: 10 }));
+    y += h;
+  });
+
+  // ---- Plan du parcours ----
+  heading('Plan du parcours');
+  const pts = [...track, ...m.alarms.filter(a => a.pos).map(a => a.pos), ...m.indices.filter(i => i.pos).map(i => i.pos)];
+  if (!pts.length) {
+    para('Aucune position GPS enregistrée pendant la mission.', { color: C.mute });
+  } else {
+    const BH = 300;
+    ensure(BH + 40);
+    const bx = M, by = y, bwid = PW, pad = 26;
+    d.rect(bx, by, bwid, BH, { fill: [248, 250, 252], stroke: C.line, lw: 0.8 });
+    const lat0 = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
+    const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+    const P = p => ({ x: p.lon * kx, y: p.lat * ky });
+    const xy = pts.map(P);
+    const minX = Math.min(...xy.map(p => p.x)), maxX = Math.max(...xy.map(p => p.x));
+    const minY = Math.min(...xy.map(p => p.y)), maxY = Math.max(...xy.map(p => p.y));
+    const S = Math.min((bwid - 2 * pad) / Math.max(maxX - minX, 30), (BH - 2 * pad) / Math.max(maxY - minY, 30));
+    const cx0 = (minX + maxX) / 2, cy0 = (minY + maxY) / 2;
+    const toPage = p => { const q = P(p); return [bx + bwid / 2 + (q.x - cx0) * S, by + BH / 2 - (q.y - cy0) * S]; };
+
+    for (let i = 1; i < 6; i++) d.line([[bx + bwid * i / 6, by], [bx + bwid * i / 6, by + BH]], [226, 232, 240], 0.4);
+    for (let i = 1; i < 5; i++) d.line([[bx, by + BH * i / 5], [bx + bwid, by + BH * i / 5]], [226, 232, 240], 0.4);
+
+    const tr = track.map(toPage);
+    if (tr.length > 1) d.line(tr, C.blue, 2);
+    if (tr.length) d.circle(tr[0][0], tr[0][1], 5, { fill: C.green, stroke: C.white, lw: 1.2 });
+    if (tr.length > 1) { const e = tr[tr.length - 1]; d.rect(e[0] - 4.5, e[1] - 4.5, 9, 9, { fill: C.navy, stroke: C.white, lw: 1.2 }); }
+    m.alarms.filter(a => a.pos && !a.indice).forEach(a => { const p = toPage(a.pos); d.circle(p[0], p[1], 4, { fill: C.orange, stroke: C.white, lw: 1 }); });
+    m.indices.filter(i => i.pos).forEach(i => {
+      const p = toPage(i.pos), lbl = String(i.n), w = d.width(lbl, 8, true);
+      d.circle(p[0], p[1], 8, { fill: C.red, stroke: C.white, lw: 1.5 });
+      d.text(p[0] - w / 2, p[1] + 3, lbl, { size: 8, bold: true, color: C.white });
+    });
+
+    // échelle
+    const target = (bwid / 4) / S;
+    const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000, 20000, 50000].reduce((a, b) => b <= target ? b : a, 1);
+    const L = nice * S, sx = bx + 14, sy = by + BH - 12, lbl = nice >= 1000 ? nice / 1000 + ' km' : nice + ' m';
+    d.rect(sx - 6, sy - 14, L + 18 + d.width(lbl, 8), 20, { fill: C.white });
+    d.line([[sx, sy - 4], [sx, sy], [sx + L, sy], [sx + L, sy - 4]], C.ink, 1);
+    d.text(sx + L + 6, sy, lbl, { size: 8 });
+    // nord
+    const nx = bx + bwid - 22, ny = by + 14;
+    d.poly([[nx, ny], [nx - 6, ny + 16], [nx, ny + 12], [nx + 6, ny + 16]], C.ink);
+    d.text(nx - d.width('N', 8, true) / 2, ny + 28, 'N', { size: 8, bold: true });
+    y = by + BH + 12;
+
+    // légende
+    let lx = M;
+    const leg = (draw, label) => { draw(lx + 5, y + 5); d.text(lx + 14, y + 8.5, label, { size: 8.5, color: C.mute }); lx += 26 + d.width(label, 8.5); };
+    leg((x, yy) => d.line([[x - 5, yy], [x + 5, yy]], C.blue, 2), 'Trajet');
+    leg((x, yy) => d.circle(x, yy, 4, { fill: C.green }), 'Départ');
+    leg((x, yy) => d.rect(x - 4, yy - 4, 8, 8, { fill: C.navy }), 'Arrivée');
+    leg((x, yy) => d.circle(x, yy, 4, { fill: C.orange }), 'Alarme sans indice');
+    leg((x, yy) => d.circle(x, yy, 5, { fill: C.red }), 'Indice');
+    y += 22;
+  }
+
+  // ---- Alarmes ----
+  heading(`Alarmes détectées (${m.alarms.length})`);
+  if (!m.alarms.length) para('Aucun dépassement d’alarme pendant la mission.', { color: C.mute });
+  else {
+    const cols = [[M + 6, 'N°'], [M + 36, 'Heure'], [M + 100, 'Concentration'], [M + 200, 'Position GPS'], [M + 450, 'Indice']];
+    const head = () => {
+      d.rect(M, y, PW, 20, { fill: C.soft });
+      cols.forEach(([x, t]) => d.text(x, y + 13.5, t, { size: 8.5, bold: true, color: C.mute }));
+      y += 20;
+    };
+    head();
+    m.alarms.forEach(a => {
+      if (y + 20 > d.H - 50) { newPage(); head(); }
+      d.text(cols[0][0], y + 13.5, String(a.n), { size: 9.5 });
+      d.text(cols[1][0], y + 13.5, fmtTime(a.t), { size: 9.5 });
+      d.text(cols[2][0], y + 13.5, `${fmt(a.conc)} ${unit}`, { size: 9.5, bold: true, color: C.red });
+      if (a.pos) {
+        const t = `${fmtPos(a.pos)} (± ${a.pos.acc} m)`;
+        d.text(cols[3][0], y + 13.5, t, { size: 9.5, color: C.blue });
+        d.link(cols[3][0], y + 3, d.width(t, 9.5), 14, mapUrl(a.pos));
+      } else d.text(cols[3][0], y + 13.5, 'position indisponible', { size: 9.5, color: C.mute });
+      d.text(cols[4][0], y + 13.5, a.indice ? 'n°' + a.indice : '—', { size: 9.5 });
+      y += 20;
+      d.line([[M, y], [d.W - M, y]], C.line, 0.5);
+    });
+  }
+
+  // ---- Indices ----
+  heading(`Indices (${m.indices.length})`);
+  if (!m.indices.length) para('Aucun indice enregistré.', { color: C.mute });
+  m.indices.forEach(ind => {
+    ensure(110);
+    d.rect(M, y, PW, 26, { fill: [254, 242, 242] });
+    d.circle(M + 16, y + 13, 9, { fill: C.red });
+    const nb = String(ind.n);
+    d.text(M + 16 - d.width(nb, 9, true) / 2, y + 16.2, nb, { size: 9, bold: true, color: C.white });
+    d.text(M + 32, y + 17, `Indice n°${ind.n}`, { size: 11.5, bold: true });
+    const right = `${fmt(ind.conc)} ${unit}`;
+    d.text(d.W - M - 10 - d.width(right, 11.5, true), y + 17, right, { size: 11.5, bold: true, color: C.red });
+    y += 34;
+    const kv = (k, v, link) => {
+      const lines = wrap(v, PW - 100, 10, false);
+      ensure(lines.length * 14 + 4);
+      d.text(M + 8, y + 10, k, { size: 9, color: C.mute });
+      lines.forEach((l, j) => {
+        d.text(M + 100, y + 10 + j * 14, l, { size: 10, color: link ? C.blue : C.ink });
+        if (link) d.link(M + 100, y + j * 14, d.width(l, 10), 13, link);
+      });
+      y += lines.length * 14 + 4;
+    };
+    kv('Date et heure', `${new Date(ind.t).toLocaleDateString('fr-FR')} à ${fmtTime(ind.t)}`);
+    kv('Alarme', 'n°' + ind.alarm);
+    if (ind.pos) kv('Position', `${fmtPos(ind.pos)} (± ${ind.pos.acc} m) – ouvrir la carte`, mapUrl(ind.pos));
+    else kv('Position', 'indisponible');
+    kv('Annotation', ind.note || '—');
+    const pw = (PW - 12) / 2;
+    for (let i = 0; i < ind.photos.length; i += 2) {
+      const row = ind.photos.slice(i, i + 2).map(ph => {
+        let w = pw, h = pw * ph.h / ph.w;
+        if (h > 230) { h = 230; w = h * ph.w / ph.h; }
+        return { ph, w, h };
+      });
+      const rh = Math.max(...row.map(r => r.h));
+      y += 6;
+      ensure(rh + 8);
+      row.forEach((r, j) => {
+        const x = M + j * (pw + 12) + (pw - r.w) / 2;
+        d.image(d.jpeg(r.ph.data, r.ph.w, r.ph.h), x, y, r.w, r.h);
+        d.rect(x, y, r.w, r.h, { stroke: C.line, lw: 0.5 });
+      });
+      y += rh + 4;
+    }
+    y += 16;
+  });
+
+  // ---- Pieds de page ----
+  const gen = `Généré le ${fmtDate(Date.now())} par Gazoscan Web`;
+  d.pages.forEach((p, i) => {
+    d.setPage(p);
+    d.line([[M, d.H - 34], [d.W - M, d.H - 34]], C.line, 0.5);
+    d.text(M, d.H - 22, gen, { size: 7.5, color: C.mute });
+    const t = `Page ${i + 1} / ${d.pages.length}`;
+    d.text(d.W - M - d.width(t, 7.5), d.H - 22, t, { size: 7.5, color: C.mute });
+  });
+  return d.build('Rapport Gazoscan – ' + m.name);
+}
+
+/* =====================================================================
+   Démo (sans appareil)
    ===================================================================== */
 function startDemo() {
   setState('demo');
-  showInfo({ name: 'Simulation', Fabricant: 'Gazomat' });
+  showInfo({ Appareil: 'Gazoscan (simulation)', Fabricant: 'Gazomat' });
   let t = 0, max = 0;
   demoTimer = setInterval(() => {
     t++;
-    if (t % 80 > 60) return;                       // gâchette relâchée 20 cycles sur 80
+    if (t % 80 > 60) return;
     const c = Math.max(0, Math.round(t % 80 > 25 && t % 80 < 45 ? 400 + 300 * Math.sin(t / 3) + Math.random() * 80 : Math.random() * 8));
     max = Math.max(max, c);
-    const p = n => String(n).padStart(5, '0');
+    const p = v => String(v).padStart(5, '0');
     const frame = `$${p(c)},${p(max)},${p(c > 500 ? 1 : 0)},${p(Math.round(3000 + 2500 * Math.sin(t / 10)))}\r\n`;
     for (let i = 0; i < frame.length; i += 20) feed(frame.slice(i, i + 20));
   }, 200);
@@ -435,13 +1221,15 @@ function startDemo() {
 function stopDemo() { clearInterval(demoTimer); demoTimer = null; setState('idle'); }
 
 /* =====================================================================
-   Boutons
+   Boutons et démarrage
    ===================================================================== */
-$('btnConnect').onclick = () => requestDevice(false);
-$('btnAll').onclick = () => requestDevice(true);
+$('btnConnect').onclick = () => requestDevice(NAME_PREFIXES.map(namePrefix => ({ namePrefix })));
 $('btnDisconnect').onclick = disconnect;
 $('btnDemo').onclick = () => demoTimer ? stopDemo() : startDemo();
 setState('idle');
+renderDevices();
+renderMissions();
+resumeMission();
 </script>
 </body>
 </html>
