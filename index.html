@@ -221,7 +221,8 @@
   <div class="sheet">
     <h3>Rapport PDF</h3>
     <p class="info" id="rInfo"></p>
-    <div class="btns"><button id="btnShare">Envoyer…</button><button class="sec" id="btnDownload">Télécharger</button></div>
+    <button id="btnShare" class="full">Envoyer…</button>
+    <div class="btns"><button class="sec" id="btnResend" hidden>Renvoyer</button><button class="sec" id="btnDownload">Télécharger</button></div>
     <div class="btns"><button class="sec" data-close>Fermer</button></div>
   </div>
 </div>
@@ -238,6 +239,7 @@ const UNIT = 'ppm·m';              // unité affichée (à adapter)
 const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
 const HISTORY_MS = 60000;
 const ALARM_GAP_MS = 3000;         // au-delà, un nouveau dépassement compte comme une nouvelle alarme
+const REARM_MS = 5000;             // après un indice, une alarme toujours active redevient disponible après 5 s
 
 /* =====================================================================
    Outils
@@ -693,7 +695,10 @@ function missionOnFrame(f) {
   if (f.conc > mission.maxConc) mission.maxConc = f.conc;
   if (!isAlarmFrame(f)) return;
   const a = mission.alarms[mission.alarms.length - 1];
-  if (!a || f.t - a.lastT > ALARM_GAP_MS) {
+  // Nouvelle alarme si : aucune encore, retour sous l'alarme depuis plus de 3 s,
+  // ou alarme toujours active mais un indice vient d'être enregistré dessus (réarmement)
+  const rearm = a && a.indice && f.t - (a.indiceT || 0) > REARM_MS;
+  if (!a || f.t - a.lastT > ALARM_GAP_MS || rearm) {
     mission.alarms.push({ n: mission.alarms.length + 1, t: f.t, lastT: f.t, conc: f.conc,
       pos: lastPos ? { ...lastPos } : null, indice: null });
     log(`Alarme n°${mission.alarms.length} : ${f.conc} ${UNIT}`);
@@ -808,6 +813,7 @@ $('btnIndiceOk').onclick = () => {
     note: $('iNote').value.trim(), photos: indiceDraft.photos, alarm: a.n };
   mission.indices.push(ind);
   a.indice = ind.n;
+  a.indiceT = Date.now();
   indiceDraft = null;
   closeModal('dlgIndice');
   log(`Indice n°${ind.n} enregistré.`);
@@ -827,7 +833,7 @@ async function renderMissions() {
     <div class="item">
       <div class="grow">
         <div class="t">${esc(m.name)}</div>
-        <div class="s">${fmtDate(m.start)} · ${fmtDur(m.end - m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)</div>
+        <div class="s">${fmtDate(m.start)} · ${fmtDur(m.end - m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)${m.sentAt ? ' · <span style="color:var(--ok)">✓ envoyé</span>' : ''}</div>
       </div>
       <button class="small" data-pdf="${m.id}">PDF</button>
       <button class="x" data-delm="${m.id}" title="Supprimer">×</button>
@@ -853,7 +859,7 @@ function showReport(m) {
     const bytes = buildReport(m);
     report = { file: new File([bytes], reportName(m), { type: 'application/pdf' }), m };
     $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>${fmtDate(m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)<br>${Math.max(1, Math.round(bytes.length / 1024))} Ko`;
-    $('btnShare').disabled = !(navigator.canShare && navigator.canShare({ files: [report.file] }));
+    renderShareState();
     openModal('dlgReport');
   } catch (e) {
     log('Erreur rapport : ' + e.message);
@@ -867,11 +873,36 @@ $('btnDownload').onclick = () => {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
-$('btnShare').onclick = async () => {
+const canShareFile = () => !!(navigator.canShare && navigator.canShare({ files: [report.file] }));
+function renderShareState() {
+  const m = report.m, b = $('btnShare'), r = $('btnResend');
+  if (m.sentAt) {
+    b.textContent = `✓ Déjà envoyé le ${fmtDate(m.sentAt)}`;
+    b.disabled = true;
+    r.hidden = !canShareFile();
+  } else {
+    b.textContent = 'Envoyer…';
+    b.disabled = !canShareFile();
+    r.hidden = true;
+  }
+}
+async function shareReport() {
+  const m = report.m;
+  $('btnShare').disabled = true;            // évite le double appui pendant l'ouverture du partage
   try {
-    await navigator.share({ files: [report.file], title: 'Rapport Gazoscan – ' + report.m.name,
-      text: `Rapport de surveillance Gazoscan : ${report.m.name} (${fmtDate(report.m.start)})` });
+    await navigator.share({ files: [report.file], title: 'Rapport Gazoscan – ' + m.name,
+      text: `Rapport de surveillance Gazoscan : ${m.name} (${fmtDate(m.start)})` });
+    m.sentAt = Date.now();
+    m.sentCount = (m.sentCount || 0) + 1;
+    await db.put(m).catch(() => {});
+    log('Rapport envoyé : ' + m.name);
+    renderMissions();
   } catch (e) { if (e.name !== 'AbortError') log('Partage impossible : ' + e.message); }
+  renderShareState();
+}
+$('btnShare').onclick = shareReport;
+$('btnResend').onclick = () => {
+  if (confirm(`Ce rapport a déjà été envoyé le ${fmtDate(report.m.sentAt)}. L’envoyer à nouveau ?`)) shareReport();
 };
 
 /* ---------- Mini générateur PDF (texte, dessins, photos JPEG, liens) ---------- */
@@ -952,7 +983,7 @@ const PDF = (() => {
           obj(p.cid, [`<< /Length ${content.length} >>\nstream\n`, content, '\nendstream']);
           p.links.forEach((l, i) => obj(p.ann[i], `<< /Type /Annot /Subtype /Link /Rect [${n(l.x)} ${n(H - l.y - l.h)} ${n(l.x + l.w)} ${n(H - l.y)}] /Border [0 0 0] /A << /S /URI /URI (${enc(l.url)}) >> >>`));
         });
-        obj(infoId, `<< /Title (${enc(title)}) /Producer (Gazoscan Web) >>`);
+        obj(infoId, `<< /Title (${enc(title.replace(/[–—]/g, '-').replace(/[’]/g, "'"))}) /Producer (Gazoscan Web) >>`);
         const xref = len;
         let x = `xref\n0 ${total + 1}\n0000000000 65535 f \n`;
         for (let i = 1; i <= total; i++) x += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
