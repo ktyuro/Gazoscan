@@ -99,7 +99,18 @@
   .thumbs button{position:absolute;top:-6px;right:-6px;width:26px;height:26px;padding:0;border-radius:50%;background:var(--bad);color:#fff;font-size:15px;line-height:26px}
   .file{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--line);border-radius:12px;padding:13px;font-weight:600;cursor:pointer;margin-top:4px;color:var(--txt)}
   .file input{display:none}
+
+  #map{height:320px;border-radius:12px;overflow:hidden;background:#cbd5e1;z-index:0}
+  .mapoff{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:#334155;font-size:14px}
+  .leaflet-marker-icon.pin{background:#dc2626;border:2.5px solid #fff;border-radius:50%;color:#fff;font:700 13px/23px system-ui;text-align:center;box-sizing:border-box;box-shadow:0 1px 5px rgba(0,0,0,.5)}
+  .mapshown[hidden]{display:none}
+  .mapshown{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mute);margin:-4px 0 8px}
+  .mapshown b{color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #btnLocate.on{background:#1e3a8a;color:#bfdbfe}
+  .leaflet-container{font-family:inherit}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
 <main>
@@ -136,6 +147,14 @@
       <p class="hint" id="gpsHint">GPS : en attente…</p>
       <div class="btns" style="margin-bottom:0"><button id="btnStop" class="sec">Terminer la mission</button></div>
     </div>
+  </section>
+
+  <!-- Carte -->
+  <section class="card" id="mapCard">
+    <div id="mapShown" class="mapshown" hidden>Mission affichée : <b id="mapShownName"></b><button class="x" id="btnMapClose" title="Revenir à ma position">×</button></div>
+    <div id="map"></div>
+    <div class="btns" style="margin-bottom:0"><button id="btnLocate" class="sec">📍 Me localiser</button></div>
+    <p class="hint" id="mapHint">Touche « Me localiser » pour afficher ta position.</p>
   </section>
 
   <div class="grid">
@@ -193,7 +212,7 @@
     <input id="fOp" placeholder="Nom de l’opérateur">
     <label for="fThr">Seuil d’alarme (<span class="u"></span>)</label>
     <input id="fThr" type="number" inputmode="numeric" min="0" placeholder="Vide = alarme du Gazoscan">
-    <p class="hint">Un dépassement est détecté quand le Gazoscan signale une alarme, ou quand la concentration atteint le seuil s’il est renseigné.</p>
+    <p class="hint">Un dépassement est détecté quand la concentration atteint ce seuil. S’il est vide, le seuil d’alarme réglé dans le Gazoscan est utilisé.</p>
     <div class="btns"><button class="sec" data-close>Annuler</button><button class="go" id="btnStartOk">Démarrer</button></div>
   </div>
 </div>
@@ -236,7 +255,7 @@ const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';  // Transparent UAR
 const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616';  // notify : trames $…
 const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';  // write  : commandes
 const NAME_PREFIXES = ['G', 'g'];  // (1) seuls les appareils dont le nom commence par G
-const APP_VERSION = '1.2.0';       // à incrémenter à chaque mise en ligne
+const APP_VERSION = '1.4.0';       // à incrémenter à chaque mise en ligne
 const APP_DATE = '16/11/2026';
 const UNIT = 'ppm·m';              // unité affichée (à adapter)
 const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
@@ -311,7 +330,7 @@ const db = (() => {
    ===================================================================== */
 let device = null, measureChar = null, sendChar = null, devInfo = null;
 let userDisconnect = false, reconnectTimer = null, reconnectDelay = 1000;
-let rxBuffer = '', flushTimer = null;
+let rxBuffer = '', flushTimer = null, lastRawLog = 0;
 let lastFrame = 0, last = null, history = [];
 let demoTimer = null, wakeLock = null, bleState = 'idle';
 
@@ -535,6 +554,7 @@ function parseFrame(seg) {
   if (seg.length < 10) { log('Trame incomplète : $' + seg); return; }
   const f = { conc: field(seg, 0), max: field(seg, 6), alarm: field(seg, 12), intens: field(seg, 18), t: Date.now() };
   if (f.conc === null) { log('Trame invalide : $' + seg); return; }
+  if (f.t - lastRawLog > 5000) { lastRawLog = f.t; log(`Trame : $${seg}  (conc ${f.conc}, max ${f.max}, alarme ${f.alarm}, intensité ${f.intens})`); }
   last = f;
   lastFrame = f.t;
   history.push({ t: f.t, v: f.conc });
@@ -545,9 +565,16 @@ function parseFrame(seg) {
 /* =====================================================================
    Affichage mesure
    ===================================================================== */
-function isAlarmFrame(f) {
+// Seuil utilisé : celui saisi pour la mission, sinon le 3e champ de la trame
+// (seuil d'alarme réglé dans le Gazoscan). Jamais de dépassement à 0.
+function alarmThreshold(f) {
   const thr = mission ? mission.threshold : null;
-  return (f.alarm > 0) || (thr > 0 && f.conc >= thr);
+  if (thr > 0) return thr;
+  return f && f.alarm > 0 ? f.alarm : null;
+}
+function isAlarmFrame(f) {
+  const thr = alarmThreshold(f);
+  return f.conc > 0 && thr !== null && f.conc >= thr;
 }
 function render() {
   if (!last) return;
@@ -559,8 +586,9 @@ function render() {
   $('mainCard').classList.toggle('alarm', alarm && pressed);
   $('max').innerHTML = `${fmt(last.max)} <small>${UNIT}</small>`;
   const a = $('alarm');
-  a.textContent = last.alarm === null ? 'Alarme —' : last.alarm > 0 ? `Alarme ${last.alarm}` : 'Pas d’alarme';
-  a.className = 'alarmbadge' + (last.alarm > 0 ? ' on' : '');
+  const thr = alarmThreshold(last);
+  a.textContent = thr === null ? 'Seuil d’alarme —' : `Seuil ${fmt(thr)}${alarm ? ' : DÉPASSÉ' : ''}`;
+  a.className = 'alarmbadge' + (alarm ? ' on' : '');
   if (last.intens !== null) {
     const { lvl, color } = intensityLevel(last.intens);
     $('intens').textContent = fmt(last.intens);
@@ -669,6 +697,8 @@ function startMission(name, operator, threshold) {
     start: Date.now(), end: null, device: isLive() ? devInfo : null,
     track: [], alarms: [], indices: [], maxConc: 0 };
   store.set('gz_active', mission.id);
+  shownMission = null;
+  follow = true;
   log('Surveillance démarrée : ' + name);
   startGeo();
   keepAwake();
@@ -677,11 +707,13 @@ function startMission(name, operator, threshold) {
 }
 
 function startGeo() {
+  if (geoWatch !== null) return;                 // déjà actif (carte ou mission)
   if (!navigator.geolocation) { gpsHint('GPS indisponible sur ce navigateur.', true); return; }
   gpsHint('GPS : recherche de la position…');
   geoWatch = navigator.geolocation.watchPosition(p => {
     lastPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy), t: Date.now() };
     gpsHint(`GPS : ${fmtPos(lastPos)} (± ${lastPos.acc} m)`);
+    mapUpdateMe();
     if (!mission) return;
     const tr = mission.track, prev = tr[tr.length - 1];
     if (lastPos.acc <= 50 && (!prev || hav(prev, lastPos) >= 5 || lastPos.t - prev.t >= 30000)) {
@@ -691,14 +723,121 @@ function startGeo() {
     }
   }, e => {
     gpsHint(e.code === 1 ? 'GPS refusé : autorisez la localisation pour ce site dans Chrome.' : 'GPS : ' + e.message, true);
+    if (e.code === 1) { navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
   }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
+  if (map) renderMapButtons();
 }
-function stopGeo() { if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
-function gpsHint(t, bad) { const h = $('gpsHint'); h.textContent = t; h.className = 'hint' + (bad ? ' bad' : ''); }
+function gpsHint(t, bad) {
+  ['gpsHint', 'mapHint'].forEach(id => { const h = $(id); h.textContent = t; h.className = 'hint' + (bad ? ' bad' : ''); });
+}
+
+/* =====================================================================
+   Carte OpenStreetMap (Leaflet)
+   ===================================================================== */
+let map = null, meMarker = null, meAcc = null, trackLine = null, layerAlarms = null, layerIndices = null;
+let follow = true, shownMission = null, mapKey = '';
+
+function initMap() {
+  if (!window.L) {
+    $('map').innerHTML = '<div class="mapoff">Carte indisponible : pas de connexion internet au chargement de la page.</div>';
+    $('btnLocate').disabled = true;
+    return;
+  }
+  map = L.map('map', { zoomControl: true }).setView([46.6, 2.4], 5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+  trackLine = L.polyline([], { color: '#0284c7', weight: 4, opacity: .9 }).addTo(map);
+  layerAlarms = L.layerGroup().addTo(map);
+  layerIndices = L.layerGroup().addTo(map);
+  map.on('dragstart', () => { follow = false; renderMapButtons(); });
+  renderMapButtons();
+}
+
+function mapUpdateMe() {
+  if (!map || !lastPos) return;
+  const ll = [lastPos.lat, lastPos.lon];
+  if (!meMarker) {
+    meAcc = L.circle(ll, { radius: lastPos.acc, color: '#38bdf8', weight: 1, fillOpacity: .12, interactive: false }).addTo(map);
+    meMarker = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 2.5, fillColor: '#2563eb', fillOpacity: 1 }).addTo(map);
+    if (follow && !shownMission) map.setView(ll, 18);
+  } else {
+    meMarker.setLatLng(ll);
+    meAcc.setLatLng(ll).setRadius(lastPos.acc);
+    if (follow && !shownMission) map.panTo(ll, { animate: true });
+  }
+}
+
+// Dessine le trajet, les alarmes et les indices (mission en cours, ou mission passée affichée)
+function mapRenderMission(force) {
+  if (!map) return;
+  const m = shownMission || mission;
+  const key = m ? `${m.id}-${m.track.length}-${m.alarms.length}-${m.indices.length}-${m.alarms.map(a => a.indice ? 1 : 0).join('')}` : '';
+  if (!force && key === mapKey) return;
+  mapKey = key;
+  trackLine.setLatLngs(m ? m.track.map(p => [p.lat, p.lon]) : []);
+  layerAlarms.clearLayers();
+  layerIndices.clearLayers();
+  if (!m) return;
+  const u = m.unit || UNIT;
+  m.alarms.filter(a => a.pos && !a.indice).forEach(a =>
+    L.circleMarker([a.pos.lat, a.pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#ea580c', fillOpacity: 1 })
+      .bindPopup(`<b>Alarme n°${a.n}</b><br>${fmtTime(a.t)}<br><b style="color:#dc2626">${fmt(a.conc)} ${u}</b>`)
+      .addTo(layerAlarms));
+  m.indices.filter(i => i.pos).forEach(i =>
+    L.marker([i.pos.lat, i.pos.lon], { icon: L.divIcon({ className: 'pin', html: String(i.n), iconSize: [28, 28], iconAnchor: [14, 14] }) })
+      .bindPopup(`<b>Indice n°${i.n}</b> · ${fmtTime(i.t)}<br><b style="color:#dc2626">${fmt(i.conc)} ${u}</b>` +
+        (i.note ? `<br>${esc(i.note)}` : '') +
+        (i.photos.length ? `<br><img src="${i.photos[0].data}" style="width:170px;border-radius:6px;margin-top:6px">` : ''),
+        { maxWidth: 200 })
+      .addTo(layerIndices));
+}
+
+function fitMission(m) {
+  const pts = [...m.track, ...m.alarms.filter(a => a.pos).map(a => a.pos), ...m.indices.filter(i => i.pos).map(i => i.pos)];
+  if (pts.length) map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])).pad(0.15), { maxZoom: 18 });
+}
+
+async function showMissionOnMap(id) {
+  if (!map) return;
+  const m = await db.get(id);
+  if (!m) return;
+  shownMission = m;
+  follow = false;
+  mapRenderMission(true);
+  fitMission(m);
+  renderMapButtons();
+  $('mapCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderMapButtons() {
+  const b = $('btnLocate');
+  b.textContent = geoWatch === null ? '📍 Me localiser' : follow ? '📍 Suivi actif' : '📍 Recentrer sur moi';
+  b.classList.toggle('on', geoWatch !== null && follow && !shownMission);
+  $('mapShown').hidden = !shownMission;
+  if (shownMission) $('mapShownName').textContent = shownMission.name;
+}
+
+$('btnLocate').onclick = () => {
+  shownMission = null;
+  follow = true;
+  startGeo();
+  mapRenderMission(true);
+  if (lastPos) map.setView([lastPos.lat, lastPos.lon], Math.max(map.getZoom(), 17));
+  renderMapButtons();
+};
+$('btnMapClose').onclick = () => {
+  shownMission = null;
+  follow = true;
+  mapRenderMission(true);
+  if (lastPos) map.setView([lastPos.lat, lastPos.lon], 17);
+  renderMapButtons();
+};
 
 function missionOnFrame(f) {
   if (!mission) return;
   if (f.conc > mission.maxConc) mission.maxConc = f.conc;
+  if (f.alarm > 0) mission.deviceAlarm = f.alarm;
   if (!isAlarmFrame(f)) return;
   const a = mission.alarms[mission.alarms.length - 1];
   // Nouvelle alarme si : aucune encore, retour sous l'alarme depuis plus de 3 s,
@@ -730,6 +869,7 @@ function renderMission() {
   $('startHint').textContent = isLive()
     ? 'Enregistre le trajet GPS et les dépassements d’alarme, puis génère un rapport PDF.'
     : 'Connecte le Gazoscan pour détecter les alarmes. Le trajet GPS est enregistré dans tous les cas.';
+  mapRenderMission();
   if (!on) return;
   $('mName').textContent = mission.name;
   $('sDist').textContent = fmtDist(trackDist(mission.track));
@@ -744,7 +884,6 @@ function renderMission() {
 $('btnStop').onclick = async () => {
   if (!confirm('Terminer la surveillance et générer le rapport ?')) return;
   mission.end = Date.now();
-  stopGeo();
   clearTimeout(saveTimer);
   await db.put(mission);
   store.del('gz_active');
@@ -754,6 +893,7 @@ $('btnStop').onclick = async () => {
   if (!isLive()) releaseWake();
   renderMission();
   renderMissions();
+  if (map) { shownMission = m; follow = false; mapRenderMission(true); fitMission(m); renderMapButtons(); }
   showReport(m);
 };
 
@@ -841,10 +981,12 @@ async function renderMissions() {
         <div class="t">${esc(m.name)}</div>
         <div class="s">${fmtDate(m.start)} · ${fmtDur(m.end - m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)${m.sentAt ? ' · <span style="color:var(--ok)">✓ envoyé</span>' : ''}</div>
       </div>
+      <button class="small sec" data-map="${m.id}">Carte</button>
       <button class="small" data-pdf="${m.id}">PDF</button>
       <button class="x" data-delm="${m.id}" title="Supprimer">×</button>
     </div>`).join('');
   el.querySelectorAll('[data-pdf]').forEach(b => b.onclick = async () => showReport(await db.get(b.dataset.pdf)));
+  el.querySelectorAll('[data-map]').forEach(b => { b.disabled = !map; b.onclick = () => showMissionOnMap(b.dataset.map); });
   el.querySelectorAll('[data-delm]').forEach(b => b.onclick = async () => {
     if (!confirm('Supprimer définitivement cette mission et ses photos ?')) return;
     await db.del(b.dataset.delm); renderMissions();
@@ -860,16 +1002,21 @@ function reportName(m) {
   const slug = m.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
   return `Rapport_Gazoscan_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}h${p(d.getMinutes())}${slug ? '_' + slug : ''}.pdf`;
 }
-function showReport(m) {
+async function showReport(m) {
+  report = null;
+  $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>Génération du rapport${navigator.onLine !== false ? ' et du fond de carte' : ''}…`;
+  ['btnShare', 'btnDownload'].forEach(id => $(id).disabled = true);
+  $('btnResend').hidden = true;
+  openModal('dlgReport');
   try {
-    const bytes = buildReport(m);
+    const bytes = await buildReport(m);
     report = { file: new File([bytes], reportName(m), { type: 'application/pdf' }), m };
     $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>${fmtDate(m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)<br>${Math.max(1, Math.round(bytes.length / 1024))} Ko`;
+    $('btnDownload').disabled = false;
     renderShareState();
-    openModal('dlgReport');
   } catch (e) {
     log('Erreur rapport : ' + e.message);
-    alert('Impossible de générer le rapport : ' + e.message);
+    $('rInfo').textContent = 'Impossible de générer le rapport : ' + e.message;
   }
 }
 $('btnDownload').onclick = () => {
@@ -1005,7 +1152,54 @@ const PDF = (() => {
 })();
 
 /* ---------- Contenu du rapport ---------- */
-function buildReport(m) {
+/* ---------- Fond de carte OpenStreetMap pour le PDF ---------- */
+const mercX = lon => (lon + 180) / 360;
+const mercY = lat => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2; };
+
+// Assemble les tuiles OSM couvrant le cadre (centre cx,cy en Mercator normalisé, Sn = pt par unité).
+// Renvoie { data (JPEG), w, h } ou null si pas de réseau / tuiles refusées.
+async function renderBasemap(cx, cy, Sn, wPt, hPt) {
+  if (navigator.onLine === false) return null;
+  try {
+    const R = 2.5;                                        // résolution : 2,5 px par point PDF
+    const W = Math.round(wPt * R), H = Math.round(hPt * R);
+    const pxPerUnit = Sn * R;
+    const z = Math.max(0, Math.min(19, Math.floor(Math.log2(pxPerUnit / 256))));
+    const n = 2 ** z, k = pxPerUnit / (256 * n);          // agrandissement des tuiles (1 à 2, plus au zoom max)
+    const x0 = cx - W / 2 / pxPerUnit, y0 = cy - H / 2 / pxPerUnit;
+    const tx0 = Math.floor(x0 * n), ty0 = Math.floor(y0 * n);
+    const tx1 = Math.floor((x0 + W / pxPerUnit) * n), ty1 = Math.floor((y0 + H / pxPerUnit) * n);
+    if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 60) return null;
+
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#e5e7eb'; g.fillRect(0, 0, W, H);
+    const timeout = ms => new Promise((_, rej) => setTimeout(() => rej(new Error('délai')), ms));
+    const jobs = [];
+    for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) {
+      if (ty < 0 || ty >= n) continue;
+      const wx = ((tx % n) + n) % n;
+      jobs.push(Promise.race([
+        fetch(`https://tile.openstreetmap.org/${z}/${wx}/${ty}.png`, { mode: 'cors' })
+          .then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+          .then(b => createImageBitmap(b)),
+        timeout(8000)
+      ]).then(img => {
+        const size = 256 * k;
+        g.drawImage(img, Math.round((tx / n - x0) * pxPerUnit), Math.round((ty / n - y0) * pxPerUnit), Math.ceil(size), Math.ceil(size));
+        return true;
+      }).catch(() => false));
+    }
+    const ok = (await Promise.all(jobs)).filter(Boolean).length;
+    if (!ok) { log('Fond de carte OSM indisponible pour le PDF.'); return null; }
+    return { data: cv.toDataURL('image/jpeg', 0.85), w: W, h: H };
+  } catch (e) {
+    log('Fond de carte OSM : ' + e.message);
+    return null;
+  }
+}
+
+async function buildReport(m, opts = {}) {
   const d = PDF.create(), M = 40, PW = d.W - 2 * M;
   const C = { ink: [15, 23, 42], mute: [100, 116, 139], line: [203, 213, 225], soft: [241, 245, 249],
     navy: [15, 23, 42], blue: [2, 132, 199], red: [220, 38, 38], orange: [234, 88, 12], green: [22, 163, 74], white: [255, 255, 255] };
@@ -1081,7 +1275,9 @@ function buildReport(m) {
   ];
   if (dev.Fabricant || dev['Modèle']) rows.push(['Fabricant / modèle', [dev.Fabricant, dev['Modèle']].filter(Boolean).join(' / ')]);
   if (dev.Firmware || dev.Logiciel) rows.push(['Firmware / logiciel', [dev.Firmware, dev.Logiciel].filter(Boolean).join(' / ')]);
-  rows.push(['Détection', m.threshold ? `Alarme du Gazoscan ou concentration >= ${fmt(m.threshold)} ${unit}` : 'Alarme du Gazoscan']);
+  rows.push(['Détection', m.threshold
+    ? `Concentration >= ${fmt(m.threshold)} ${unit} (seuil saisi)`
+    : `Concentration >= seuil d’alarme du Gazoscan${m.deviceAlarm ? ` (${fmt(m.deviceAlarm)} ${unit})` : ''}`]);
   rows.push(['Points GPS', String(track.length)]);
   rows.forEach(([k, v], i) => {
     const lines = wrap(v, PW - 150, 10, false);
@@ -1102,22 +1298,38 @@ function buildReport(m) {
     const BH = 300;
     ensure(BH + 40);
     const bx = M, by = y, bwid = PW, pad = 26;
-    d.rect(bx, by, bwid, BH, { fill: [248, 250, 252], stroke: C.line, lw: 0.8 });
+    // Projection Web Mercator (celle d'OpenStreetMap), coordonnées normalisées 0..1
     const lat0 = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
-    const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
-    const P = p => ({ x: p.lon * kx, y: p.lat * ky });
+    const metersPerUnit = 40075016.686 * Math.cos(lat0 * Math.PI / 180);
+    const P = p => ({ x: mercX(p.lon), y: mercY(p.lat) });
     const xy = pts.map(P);
     const minX = Math.min(...xy.map(p => p.x)), maxX = Math.max(...xy.map(p => p.x));
     const minY = Math.min(...xy.map(p => p.y)), maxY = Math.max(...xy.map(p => p.y));
-    const S = Math.min((bwid - 2 * pad) / Math.max(maxX - minX, 30), (BH - 2 * pad) / Math.max(maxY - minY, 30));
+    const minExt = 40 / metersPerUnit;   // au moins 40 m affichés
+    const Sn = Math.min((bwid - 2 * pad) / Math.max(maxX - minX, minExt), (BH - 2 * pad) / Math.max(maxY - minY, minExt)); // pt par unité
+    const S = Sn / metersPerUnit;        // pt par mètre (pour l'échelle)
     const cx0 = (minX + maxX) / 2, cy0 = (minY + maxY) / 2;
-    const toPage = p => { const q = P(p); return [bx + bwid / 2 + (q.x - cx0) * S, by + BH / 2 - (q.y - cy0) * S]; };
+    const toPage = p => { const q = P(p); return [bx + bwid / 2 + (q.x - cx0) * Sn, by + BH / 2 + (q.y - cy0) * Sn]; };
 
-    for (let i = 1; i < 6; i++) d.line([[bx + bwid * i / 6, by], [bx + bwid * i / 6, by + BH]], [226, 232, 240], 0.4);
-    for (let i = 1; i < 5; i++) d.line([[bx, by + BH * i / 5], [bx + bwid, by + BH * i / 5]], [226, 232, 240], 0.4);
+    // Fond OpenStreetMap si le réseau est disponible, sinon fond neutre quadrillé
+    const base = opts.basemap !== false ? await renderBasemap(cx0, cy0, Sn, bwid, BH) : null;
+    if (base) {
+      d.image(d.jpeg(base.data, base.w, base.h), bx, by, bwid, BH);
+      d.rect(bx, by, bwid, BH, { stroke: C.line, lw: 0.8 });
+      const attr = '© contributeurs OpenStreetMap';
+      const aw = d.width(attr, 6.5);
+      d.rect(bx + bwid - aw - 8, by + BH - 11, aw + 8, 11, { fill: C.white });
+      d.text(bx + bwid - aw - 4, by + BH - 3, attr, { size: 6.5, color: C.mute });
+      d.link(bx + bwid - aw - 8, by + BH - 11, aw + 8, 11, 'https://www.openstreetmap.org/copyright');
+    } else {
+      d.rect(bx, by, bwid, BH, { fill: [248, 250, 252], stroke: C.line, lw: 0.8 });
+      for (let i = 1; i < 6; i++) d.line([[bx + bwid * i / 6, by], [bx + bwid * i / 6, by + BH]], [226, 232, 240], 0.4);
+      for (let i = 1; i < 5; i++) d.line([[bx, by + BH * i / 5], [bx + bwid, by + BH * i / 5]], [226, 232, 240], 0.4);
+    }
 
     const tr = track.map(toPage);
-    if (tr.length > 1) d.line(tr, C.blue, 2);
+    if (tr.length > 1 && base) d.line(tr, C.white, 4.5);   // liseré blanc pour la lisibilité sur la carte
+    if (tr.length > 1) d.line(tr, C.blue, 2.5);
     if (tr.length) d.circle(tr[0][0], tr[0][1], 5, { fill: C.green, stroke: C.white, lw: 1.2 });
     if (tr.length > 1) { const e = tr[tr.length - 1]; d.rect(e[0] - 4.5, e[1] - 4.5, 9, 9, { fill: C.navy, stroke: C.white, lw: 1.2 }); }
     m.alarms.filter(a => a.pos && !a.indice).forEach(a => { const p = toPage(a.pos); d.circle(p[0], p[1], 4, { fill: C.orange, stroke: C.white, lw: 1 }); });
@@ -1251,7 +1463,7 @@ function startDemo() {
     const c = Math.max(0, Math.round(t % 80 > 25 && t % 80 < 45 ? 400 + 300 * Math.sin(t / 3) + Math.random() * 80 : Math.random() * 8));
     max = Math.max(max, c);
     const p = v => String(v).padStart(5, '0');
-    const frame = `$${p(c)},${p(max)},${p(c > 500 ? 1 : 0)},${p(Math.round(3000 + 2500 * Math.sin(t / 10)))}\r\n`;
+    const frame = `$${p(c)},${p(max)},${p(500)},${p(Math.round(3000 + 2500 * Math.sin(t / 10)))}\r\n`;
     for (let i = 0; i < frame.length; i += 20) feed(frame.slice(i, i + 20));
   }, 200);
 }
@@ -1266,7 +1478,10 @@ $('btnDemo').onclick = () => demoTimer ? stopDemo() : startDemo();
 setState('idle');
 renderDevices();
 renderMissions();
+initMap();
 resumeMission();
+// GPS démarré d'office si l'autorisation a déjà été donnée (sinon : bouton « Me localiser » ou démarrage de mission)
+try { navigator.permissions.query({ name: 'geolocation' }).then(r => { if (r.state === 'granted') { startGeo(); renderMapButtons(); } }); } catch {}
 </script>
 </body>
 </html>
