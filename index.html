@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Gazoscan – Concentration</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --line:#334155; --txt:#e2e8f0; --mute:#94a3b8;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --info:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+  main{max-width:520px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+  h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
+  .pill{font-size:13px;padding:5px 10px;border-radius:999px;background:var(--line);color:var(--txt);white-space:nowrap}
+  .pill::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mute);vertical-align:1px}
+  .pill.connected::before{background:var(--ok)}
+  .pill.connecting::before,.pill.reconnecting::before{background:var(--warn);animation:blink 1s infinite}
+  .pill.failed::before{background:var(--bad)}
+  @keyframes blink{50%{opacity:.25}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+  .main{text-align:center;padding:22px 16px 18px;transition:border-color .2s}
+  .main.alarm{border-color:var(--bad);box-shadow:0 0 0 2px rgba(239,68,68,.35) inset}
+  .lbl{font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px}
+  .conc{font-size:84px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;margin:10px 0 2px;transition:color .2s,opacity .2s}
+  .conc.zero{color:var(--ok)} .conc.pos{color:var(--warn)} .conc.alarm{color:var(--bad)}
+  .conc.idle{opacity:.35}
+  .unit{font-size:16px;color:var(--mute)}
+  .trigger{margin-top:12px;font-size:14px;color:var(--mute)}
+  .trigger b{color:var(--txt)}
+  .trigger.on b{color:var(--ok)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  .grid .card{margin:0}
+  .val{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:6px}
+  .val small{font-size:13px;color:var(--mute);font-weight:400}
+  .alarmbadge{display:inline-block;margin-top:8px;font-size:12px;padding:3px 8px;border-radius:6px;background:var(--line);color:var(--mute)}
+  .alarmbadge.on{background:var(--bad);color:#fff}
+
+  .bars{display:flex;gap:3px;align-items:flex-end;height:34px;margin-top:10px}
+  .bars i{flex:1;background:var(--line);border-radius:2px}
+  canvas{width:100%;height:120px;display:block;margin-top:8px}
+
+  .btns{display:flex;gap:10px;margin:14px 0}
+  button{flex:1;font:inherit;font-size:16px;font-weight:600;padding:14px;border-radius:12px;border:0;cursor:pointer;color:#0f172a;background:var(--info)}
+  button.sec{background:var(--line);color:var(--txt)}
+  button:disabled{opacity:.4}
+  .info{font-size:13px;color:var(--mute);line-height:1.6}
+  .info b{color:var(--txt);font-weight:500}
+  details{font-size:12px}
+  summary{cursor:pointer;color:var(--mute);font-size:13px}
+  #log{font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto;margin:8px 0 0;color:#cbd5e1}
+  .warnbox{background:#422006;border:1px solid #a16207;color:#fde68a;border-radius:12px;padding:12px;font-size:14px;margin-bottom:12px;display:none}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Gazoscan</h1>
+    <span id="state" class="pill">Déconnecté</span>
+  </header>
+
+  <div id="support" class="warnbox"></div>
+
+  <section id="mainCard" class="card main">
+    <div class="lbl">Concentration</div>
+    <div id="conc" class="conc idle">—</div>
+    <div class="unit" id="unit"></div>
+    <div id="trigger" class="trigger">Gâchette : <b>—</b></div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="lbl">Max</div>
+      <div class="val" id="max">—</div>
+      <span id="alarm" class="alarmbadge">Alarme —</span>
+    </section>
+    <section class="card">
+      <div class="lbl">Intensité</div>
+      <div class="val" id="intens">—</div>
+      <div class="bars" id="bars"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="lbl">Historique (60 s)</div>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <div class="btns">
+    <button id="btnConnect">Connecter</button>
+    <button id="btnDisconnect" class="sec" disabled>Déconnecter</button>
+  </div>
+  <div class="btns" style="margin-top:-4px">
+    <button id="btnAll" class="sec">Voir tous les appareils</button>
+    <button id="btnDemo" class="sec">Démo</button>
+  </div>
+
+  <section class="card info" id="devinfo">Aucun appareil.</section>
+
+  <section class="card">
+    <details>
+      <summary>Journal</summary>
+      <div id="log"></div>
+    </details>
+  </section>
+</main>
+
+<script>
+/* =====================================================================
+   Paramètres repris de Gazoscan.cs
+   ===================================================================== */
+// Service "Transparent UART" Microchip (UUID se terminant par …e455 dans le C#)
+const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616'; // notify : trames $…
+const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3'; // write  : commandes
+const NAME_PREFIXES = ['Gazoscan', 'GAZOSCAN', 'gazoscan', 'GazoScan'];
+const UNIT = 'ppm·m';            // unité affichée (à adapter)
+const TRIGGER_TIMEOUT_MS = 1000; // sans trame depuis 1 s => gâchette relâchée
+const HISTORY_MS = 60000;
+
+/* =====================================================================
+   État
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+let device = null, measureChar = null, sendChar = null;
+let userDisconnect = false, reconnectTimer = null, reconnectDelay = 1000;
+let rxBuffer = '', flushTimer = null;
+let lastFrame = 0, last = null, history = [];
+let demoTimer = null, wakeLock = null;
+
+$('unit').textContent = UNIT;
+for (let i = 0; i < 12; i++) $('bars').appendChild(document.createElement('i'));
+
+function log(msg) {
+  const t = new Date().toLocaleTimeString('fr-FR');
+  const el = $('log');
+  el.textContent = `[${t}] ${msg}\n` + el.textContent.split('\n').slice(0, 80).join('\n');
+}
+
+const STATES = {
+  idle: 'Déconnecté', searching: 'Recherche…', connecting: 'Connexion…',
+  connected: 'Connecté', reconnecting: 'Reconnexion…', failed: 'Échec', demo: 'Démo'
+};
+function setState(s) {
+  const el = $('state');
+  el.className = 'pill ' + (s === 'demo' ? 'connected' : s);
+  el.textContent = STATES[s] || s;
+  const busy = s !== 'idle' && s !== 'failed';
+  $('btnConnect').disabled = busy;
+  $('btnAll').disabled = busy;
+  $('btnDisconnect').disabled = !busy;
+  $('btnDemo').textContent = s === 'demo' ? 'Arrêter démo' : 'Démo';
+  $('btnDemo').disabled = busy && s !== 'demo';
+}
+
+/* =====================================================================
+   Support navigateur
+   ===================================================================== */
+(function checkSupport() {
+  let msg = '';
+  if (!window.isSecureContext) msg = 'Cette page doit être servie en HTTPS (ou localhost) pour utiliser le Bluetooth.';
+  else if (!navigator.bluetooth) msg = 'Web Bluetooth non disponible. Utilisez Chrome, Edge ou Samsung Internet sur Android (pas Firefox, pas iPhone).';
+  if (msg) { $('support').textContent = msg; $('support').style.display = 'block'; $('btnConnect').disabled = $('btnAll').disabled = true; }
+})();
+
+/* =====================================================================
+   Connexion BLE
+   ===================================================================== */
+async function requestDevice(acceptAll) {
+  const optionalServices = [SERVICE_UUID, 'device_information'];
+  const opts = acceptAll
+    ? { acceptAllDevices: true, optionalServices }
+    : { filters: [{ services: [SERVICE_UUID] }, ...NAME_PREFIXES.map(namePrefix => ({ namePrefix }))], optionalServices };
+  setState('searching');
+  try {
+    device = await navigator.bluetooth.requestDevice(opts);
+  } catch (e) {
+    log('Sélection annulée : ' + e.message);
+    setState('idle');
+    return;
+  }
+  log(`Appareil choisi : ${device.name || '(sans nom)'} [${device.id}]`);
+  device.removeEventListener('gattserverdisconnected', onDisconnected);
+  device.addEventListener('gattserverdisconnected', onDisconnected);
+  userDisconnect = false;
+  reconnectDelay = 1000;
+  await connect();
+}
+
+function withTimeout(p, ms, what) {
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ' : délai dépassé')), ms))]);
+}
+
+async function connect() {
+  if (!device) return;
+  clearTimeout(reconnectTimer);
+  setState(measureChar ? 'reconnecting' : 'connecting');
+  try {
+    const server = await withTimeout(device.gatt.connect(), 15000, 'Connexion');
+    log('GATT connecté.');
+    const service = await withTimeout(server.getPrimaryService(SERVICE_UUID), 8000, 'Service');
+
+    measureChar = await service.getCharacteristic(MEASURE_UUID);
+    measureChar.removeEventListener('characteristicvaluechanged', onMeasure);
+    measureChar.addEventListener('characteristicvaluechanged', onMeasure); // abonnement AVANT le CCCD
+    await measureChar.startNotifications();
+    log('Notifications mesure actives.');
+
+    try { sendChar = await service.getCharacteristic(SENDING_UUID); log('Canal d’envoi trouvé.'); }
+    catch { sendChar = null; log('Canal d’envoi introuvable.'); }
+
+    rxBuffer = '';
+    reconnectDelay = 1000;
+    setState('connected');
+    keepAwake();
+    readDeviceInfo(server);
+  } catch (e) {
+    log('Échec : ' + e.message);
+    try { device.gatt.disconnect(); } catch {}
+    if (!userDisconnect) scheduleReconnect(); else setState('failed');
+  }
+}
+
+function onDisconnected() {
+  log('Liaison perdue.');
+  if (userDisconnect) { setState('idle'); return; }
+  scheduleReconnect();
+}
+
+function scheduleReconnect() {
+  setState('reconnecting');
+  clearTimeout(reconnectTimer);
+  log(`Nouvelle tentative dans ${reconnectDelay / 1000} s…`);
+  reconnectTimer = setTimeout(connect, reconnectDelay);
+  reconnectDelay = Math.min(reconnectDelay * 2, 15000);
+}
+
+async function disconnect() {
+  userDisconnect = true;
+  clearTimeout(reconnectTimer);
+  if (demoTimer) return stopDemo();
+  try { if (measureChar) await measureChar.stopNotifications(); } catch {}
+  try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
+  measureChar = sendChar = null;
+  releaseWake();
+  setState('idle');
+}
+
+async function readDeviceInfo(server) {
+  const info = { name: device.name || '(sans nom)' };
+  try {
+    const s = await server.getPrimaryService('device_information');
+    const map = { manufacturer_name_string: 'Fabricant', model_number_string: 'Modèle',
+      hardware_revision_string: 'Matériel', firmware_revision_string: 'Firmware', software_revision_string: 'Logiciel' };
+    for (const [uuid, label] of Object.entries(map)) {
+      try {
+        const v = await (await s.getCharacteristic(uuid)).readValue();
+        info[label] = new TextDecoder().decode(v).replace(/\0/g, '').trim();
+      } catch {}
+    }
+  } catch { log('Service Device Information non lisible.'); }
+  showInfo(info);
+}
+
+function showInfo(info) {
+  $('devinfo').innerHTML = Object.entries(info)
+    .map(([k, v]) => `${k === 'name' ? 'Appareil' : k} : <b>${String(v).replace(/[<>&]/g, '')}</b>`).join('<br>');
+}
+
+/* =====================================================================
+   Réception et décodage des trames
+   Format (cf. NewInformationLine) : $CCCCC,MMMMM,AAAAA,IIIII
+     C = concentration, M = max, A = alarme, I = intensité lumineuse
+   Les trames peuvent arriver découpées (MTU 20 octets) : on les reconstitue.
+   ===================================================================== */
+function onMeasure(ev) {
+  const dv = ev.target.value;
+  feed(new TextDecoder('latin1').decode(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)));
+}
+
+function feed(txt) {
+  txt = txt.replace(/\0/g, '');
+  if (!txt) return;
+  if (!rxBuffer && txt[0] !== '$') {          // réponse texte (mode test / configuration)
+    log('Message : ' + txt.trim());
+    return;
+  }
+  rxBuffer += txt;
+  clearTimeout(flushTimer);
+
+  // Tout segment suivi d'un autre '$' est complet
+  const parts = rxBuffer.split('$');
+  rxBuffer = '$' + parts.pop();
+  for (const p of parts) if (p) parseFrame(p);
+
+  // Le dernier segment est complet s'il a sa longueur ou une fin de ligne
+  const tail = rxBuffer.slice(1);
+  if (tail.length >= 23 || /[\r\n]/.test(tail)) { parseFrame(tail); rxBuffer = ''; }
+  else flushTimer = setTimeout(() => { if (rxBuffer.length > 11) parseFrame(rxBuffer.slice(1)); rxBuffer = ''; }, 150);
+}
+
+function field(s, start) {
+  const v = s.substr(start, 5);
+  return /^\s*-?\d+\s*$/.test(v) ? parseInt(v, 10) : null;
+}
+
+function intensityLevel(i) {
+  let lvl = 12, color = 2;
+  for (const th of [52000, 25600, 12800, 6400, 3200]) if (i < th) lvl--;
+  if (i < 1600) { lvl--; color--; }
+  for (const th of [800, 400, 200]) if (i < th) lvl--;
+  if (i < 100) { lvl--; color--; }
+  if (i < 50) lvl--;
+  return { lvl, color };   // color : 2 = bon, 1 = moyen, 0 = faible
+}
+
+function parseFrame(seg) {
+  seg = seg.replace(/[\r\n]/g, '');
+  if (seg.length < 10) { log('Trame incomplète : $' + seg); return; }
+  const f = {
+    conc: field(seg, 0), max: field(seg, 6),
+    alarm: field(seg, 12), intens: field(seg, 18), t: Date.now()
+  };
+  if (f.conc === null) { log('Trame invalide : $' + seg); return; }
+  last = f;
+  lastFrame = f.t;
+  history.push({ t: f.t, v: f.conc });
+  render();
+}
+
+/* =====================================================================
+   Affichage
+   ===================================================================== */
+const fmt = n => n === null || n === undefined ? '—' : n.toLocaleString('fr-FR');
+
+function render() {
+  if (!last) return;
+  const pressed = Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS;
+  const alarm = last.alarm > 0;
+
+  const c = $('conc');
+  c.textContent = fmt(last.conc);
+  c.className = 'conc ' + (alarm ? 'alarm' : last.conc > 0 ? 'pos' : 'zero') + (pressed ? '' : ' idle');
+  $('mainCard').classList.toggle('alarm', alarm && pressed);
+
+  $('max').innerHTML = `${fmt(last.max)} <small>${UNIT}</small>`;
+  const a = $('alarm');
+  a.textContent = last.alarm === null ? 'Alarme —' : alarm ? `Alarme ${last.alarm}` : 'Pas d’alarme';
+  a.className = 'alarmbadge' + (alarm ? ' on' : '');
+
+  if (last.intens !== null) {
+    const { lvl, color } = intensityLevel(last.intens);
+    $('intens').textContent = fmt(last.intens);
+    const col = ['var(--bad)', 'var(--warn)', 'var(--ok)'][Math.max(0, color)];
+    [...$('bars').children].forEach((b, i) => {
+      b.style.height = (30 + i * 6) + '%';
+      b.style.background = i < lvl ? col : 'var(--line)';
+    });
+  }
+}
+
+function tick() {
+  const connected = $('state').classList.contains('connected');
+  const pressed = connected && last && Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS;
+  const tr = $('trigger');
+  tr.className = 'trigger' + (pressed ? ' on' : '');
+  tr.innerHTML = 'Gâchette : <b>' + (!connected ? '—' : pressed ? 'appuyée' : 'relâchée') + '</b>';
+  if (last) {
+    $('conc').classList.toggle('idle', !pressed);
+    $('mainCard').classList.toggle('alarm', !!(pressed && last.alarm > 0));
+  }
+  drawChart();
+}
+setInterval(tick, 250);
+
+function drawChart() {
+  const cv = $('chart'), dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const now = Date.now();
+  history = history.filter(p => now - p.t <= HISTORY_MS);
+  const maxV = Math.max(10, ...history.map(p => p.v)) * 1.1;
+  g.strokeStyle = '#334155'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, h - 0.5); g.lineTo(w, h - 0.5); g.stroke();
+  g.fillStyle = '#94a3b8'; g.font = '11px system-ui';
+  g.fillText(fmt(Math.round(maxV)), 4, 12);
+  if (!history.length) return;
+  g.strokeStyle = '#38bdf8'; g.lineWidth = 2; g.beginPath();
+  let prev = null;
+  for (const p of history) {
+    const x = w - (now - p.t) / HISTORY_MS * w, y = h - 2 - p.v / maxV * (h - 18);
+    if (!prev || p.t - prev.t > 1500) g.moveTo(x, y); else g.lineTo(x, y);  // trou si gâchette relâchée
+    prev = p;
+  }
+  g.stroke();
+}
+
+/* =====================================================================
+   Écran allumé pendant la mesure
+   ===================================================================== */
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+}
+function releaseWake() { try { wakeLock && wakeLock.release(); } catch {} wakeLock = null; }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && $('state').classList.contains('connected')) { wakeLock = null; keepAwake(); }
+});
+
+/* =====================================================================
+   Démo (sans appareil) : fabrique des trames découpées en paquets de 20 octets
+   ===================================================================== */
+function startDemo() {
+  setState('demo');
+  showInfo({ name: 'Simulation', Fabricant: 'Gazomat' });
+  let t = 0, max = 0;
+  demoTimer = setInterval(() => {
+    t++;
+    if (t % 80 > 60) return;                       // gâchette relâchée 20 cycles sur 80
+    const c = Math.max(0, Math.round(t % 80 > 25 && t % 80 < 45 ? 400 + 300 * Math.sin(t / 3) + Math.random() * 80 : Math.random() * 8));
+    max = Math.max(max, c);
+    const p = n => String(n).padStart(5, '0');
+    const frame = `$${p(c)},${p(max)},${p(c > 500 ? 1 : 0)},${p(Math.round(3000 + 2500 * Math.sin(t / 10)))}\r\n`;
+    for (let i = 0; i < frame.length; i += 20) feed(frame.slice(i, i + 20));
+  }, 200);
+}
+function stopDemo() { clearInterval(demoTimer); demoTimer = null; setState('idle'); }
+
+/* =====================================================================
+   Boutons
+   ===================================================================== */
+$('btnConnect').onclick = () => requestDevice(false);
+$('btnAll').onclick = () => requestDevice(true);
+$('btnDisconnect').onclick = disconnect;
+$('btnDemo').onclick = () => demoTimer ? stopDemo() : startDemo();
+setState('idle');
+</script>
+</body>
+</html>
