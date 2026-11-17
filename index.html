@@ -137,6 +137,24 @@
   .vcstate{font-size:6vh;margin-top:2vh}
   .vcthr{font-size:5vh;color:var(--mute);margin-top:1vh}
   #vc.alarm .vcunit,#vc.alarm .vcthr{color:#fecaca}
+  /* Visual_Concentration, mode carte : carte plein écran + concentration en transparence */
+  #vcMap{position:absolute;top:12px;left:12px;z-index:2}
+  #vcRecenter{position:absolute;bottom:30px;right:12px;z-index:2;display:none;width:auto;padding:10px 14px}
+  #vcMapHost{display:none;position:absolute;inset:0;z-index:0}
+  #vcMapHost #map{height:100%;border-radius:0}
+  #vcPanel{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center}
+  #vcMin{z-index:2}
+  #vc.map{background:#000;justify-content:flex-start;padding:0}
+  #vc.map #vcMapHost{display:block}
+  #vc.map #vcRecenter{display:block}
+  #vc.map .leaflet-top.leaflet-left{top:60px}
+  #vc.map #vcPanel{pointer-events:none;position:absolute;left:12px;bottom:12px;padding:6px 26px 10px;border-radius:16px;background:rgba(15,23,42,.62);border:2px solid rgba(255,255,255,.18);box-shadow:0 4px 18px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+  #vc.map.alarm #vcPanel{background:rgba(153,27,27,.72);border-color:#fecaca}
+  #vc.map .vcconc{font-size:min(24vh,15vw);text-shadow:0 2px 6px rgba(0,0,0,.8)}
+  #vc.map .vcconc.idle{opacity:.6}
+  #vc.map .vcunit,#vc.map .vcthr{font-size:4vh;color:#e2e8f0;text-shadow:0 1px 3px #000}
+  #vc.map .vcstate{font-size:4.5vh;margin-top:.5vh;color:#fff;text-shadow:0 1px 3px #000}
+  #vc.map .vcthr{margin-top:0}
   #vcOpen{display:none;position:fixed;right:14px;bottom:14px;z-index:25;width:auto;padding:12px 16px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
   @media (orientation: landscape) and (max-height: 600px){
     body.vc-on #vc{display:flex}
@@ -258,11 +276,16 @@
 
 <!-- Visual_Concentration -->
 <div id="vc">
+  <div id="vcMapHost"></div>
+  <button id="vcMap" class="small sec"></button>
   <button id="vcMin" class="small sec" data-i18n="vc.minimize"></button>
-  <div id="vcConc" class="vcconc">—</div>
-  <div class="vcunit" id="vcUnit"></div>
-  <div class="vcstate" id="vcState"></div>
-  <div class="vcthr" id="vcThr"></div>
+  <div id="vcPanel">
+    <div id="vcConc" class="vcconc">—</div>
+    <div class="vcunit" id="vcUnit"></div>
+    <div class="vcstate" id="vcState"></div>
+    <div class="vcthr" id="vcThr"></div>
+  </div>
+  <button id="vcRecenter" class="sec" data-i18n-title="recenter">📍</button>
 </div>
 <button id="vcOpen" data-i18n="vc.open"></button>
 <!-- /Visual_Concentration -->
@@ -320,7 +343,7 @@ const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';  // Transparent UAR
 const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616';  // notify : trames $…
 const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';  // write  : commandes
 const NAME_PREFIXES = ['G', 'g'];  // (1) seuls les appareils dont le nom commence par G
-const APP_VERSION = '1.7.1';       // à incrémenter à chaque mise en ligne
+const APP_VERSION = '1.7.2';       // à incrémenter à chaque mise en ligne
 const APP_DATE = '17/11/2026';
 const UNIT = 'ppm·m';              // unité affichée (à adapter)
 const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
@@ -573,6 +596,8 @@ const I18N = {
   "noSamples": "Pas de mesures enregistrées pour cette mission.",
   "chartMission": "Mission : {n}",
   "vc.minimize": "Réduire",
+  "vc.map": "🗺 Carte",
+  "vc.conc": "⛶ Concentration",
   "vc.open": "⛶ Concentration",
   "annotShort": "Annot.",
   "addAnnot": "📝 Annotation",
@@ -769,6 +794,8 @@ const I18N = {
   "noSamples": "No measurements recorded for this mission.",
   "chartMission": "Mission: {n}",
   "vc.minimize": "Minimize",
+  "vc.map": "🗺 Map",
+  "vc.conc": "⛶ Concentration",
   "vc.open": "⛶ Concentration",
   "annotShort": "Notes",
   "addAnnot": "📝 Annotation",
@@ -965,6 +992,8 @@ const I18N = {
   "noSamples": "Für diesen Einsatz wurden keine Messwerte gespeichert.",
   "chartMission": "Einsatz: {n}",
   "vc.minimize": "Verkleinern",
+  "vc.map": "🗺 Karte",
+  "vc.conc": "⛶ Konzentration",
   "vc.open": "⛶ Konzentration",
   "annotShort": "Anm.",
   "addAnnot": "📝 Anmerkung",
@@ -1161,6 +1190,8 @@ const I18N = {
   "noSamples": "No hay mediciones registradas para esta misión.",
   "chartMission": "Misión: {n}",
   "vc.minimize": "Reducir",
+  "vc.map": "🗺 Mapa",
+  "vc.conc": "⛶ Concentración",
   "vc.open": "⛶ Concentración",
   "annotShort": "Anot.",
   "addAnnot": "📝 Anotación",
@@ -1357,6 +1388,8 @@ const I18N = {
   "noSamples": "Nessuna misura registrata per questa missione.",
   "chartMission": "Missione: {n}",
   "vc.minimize": "Riduci",
+  "vc.map": "🗺 Mappa",
+  "vc.conc": "⛶ Concentrazione",
   "vc.open": "⛶ Concentrazione",
   "annotShort": "Annot.",
   "addAnnot": "📝 Annotazione",
@@ -2913,16 +2946,31 @@ function stopDemo() { clearInterval(demoTimer); demoTimer = null; setState('idle
    (détection : (orientation: landscape) and (max-height: 600px), donc pas sur un PC)
    ===================================================================== */
 const vcMq = window.matchMedia('(orientation: landscape) and (max-height: 600px)');
-let vcMinimized = false;
+let vcMinimized = false, vcMapMode = false;
 function vcApply() {
-  document.body.classList.toggle('vc-on', vcMq.matches && !vcMinimized);
+  const on = vcMq.matches && !vcMinimized;
+  document.body.classList.toggle('vc-on', on);
   document.body.classList.toggle('vc-min', vcMq.matches && vcMinimized);
+  // Mode carte : la carte de la page est déplacée dans l'écran paysage (puis remise à sa place)
+  const wantMap = on && vcMapMode, m = $('map');
+  $('vc').classList.toggle('map', wantMap);
+  $('vcMap').textContent = t(vcMapMode ? 'vc.conc' : 'vc.map');
+  const host = wantMap ? $('vcMapHost') : $('mapCard');
+  if (m.parentNode !== host) {
+    if (wantMap) host.appendChild(m); else host.insertBefore(m, $('mapShown').nextSibling);
+    if (map) setTimeout(() => {
+      map.invalidateSize();
+      if (wantMap && lastPos && follow && !shownMission) map.setView([lastPos.lat, lastPos.lon], Math.max(map.getZoom(), 17));
+    }, 50);
+  }
   vcRender();
 }
 const vcChange = () => { if (!vcMq.matches) vcMinimized = false; vcApply(); };   // retour en portrait : réarmé
 if (vcMq.addEventListener) vcMq.addEventListener('change', vcChange); else vcMq.addListener(vcChange);
 $('vcMin').onclick = () => { vcMinimized = true; vcApply(); };
 $('vcOpen').onclick = () => { vcMinimized = false; vcApply(); };
+$('vcMap').onclick = () => { vcMapMode = !vcMapMode; vcApply(); };
+$('vcRecenter').onclick = () => { if (!$('btnLocate').disabled) $('btnLocate').click(); };
 function vcRender() {
   if (!document.body.classList.contains('vc-on')) return;
   const live = isLive(), pressed = !!(live && last && Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS);
