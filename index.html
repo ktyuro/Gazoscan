@@ -320,7 +320,7 @@ const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';  // Transparent UAR
 const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616';  // notify : trames $…
 const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';  // write  : commandes
 const NAME_PREFIXES = ['G', 'g'];  // (1) seuls les appareils dont le nom commence par G
-const APP_VERSION = '1.7.0';       // à incrémenter à chaque mise en ligne
+const APP_VERSION = '1.7.1';       // à incrémenter à chaque mise en ligne
 const APP_DATE = '17/11/2026';
 const UNIT = 'ppm·m';              // unité affichée (à adapter)
 const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
@@ -1448,19 +1448,44 @@ function setState(s) {
 /* =====================================================================
    (2) Historique des appareils connectés
    ===================================================================== */
+// Chrome peut redonner un identifiant différent au même appareil quand on le rechoisit dans le
+// sélecteur (autorisation non conservée) : on reconnaît donc aussi un appareil connu par son nom.
 function rememberDevice(extra) {
   if (!device) return;
-  const list = store.get('gz_devices', {});
-  const e = list[device.id] || { id: device.id, count: 0 };
-  e.name = device.name || e.name || t('unnamed');
+  const list = dedupeDevices(store.get('gz_devices', {}));
+  const name = device.name || '';
+  let e = list[device.id];
+  if (!e && name) {
+    const old = Object.values(list).find(x => x.name === name);
+    if (old) { delete list[old.id]; e = old; e.id = device.id; }
+  }
+  e ||= { id: device.id, count: 0 };
+  e.name = name || e.name || t('unnamed');
   if (extra) Object.assign(e, extra);
   else { e.last = Date.now(); e.count = (e.count || 0) + 1; }
   list[device.id] = e;
   store.set('gz_devices', list);
   renderDevices();
 }
+// Fusionne les doublons (même nom, identifiants différents) : on garde le plus récent et on cumule les connexions
+function dedupeDevices(list) {
+  const byName = {};
+  for (const d of Object.values(list)) {
+    const k = d.name || d.id, o = byName[k];
+    if (!o) { byName[k] = { ...d }; continue; }
+    const keep = (d.last || 0) >= (o.last || 0) ? { ...d } : o;
+    keep.count = (o.count || 0) + (d.count || 0);
+    keep.fw ||= o.fw || d.fw;
+    byName[k] = keep;
+  }
+  const out = {};
+  for (const d of Object.values(byName)) out[d.id] = d;
+  return out;
+}
 function renderDevices() {
-  const list = Object.values(store.get('gz_devices', {})).sort((a, b) => b.last - a.last);
+  const raw = store.get('gz_devices', {}), clean = dedupeDevices(raw);
+  if (Object.keys(clean).length !== Object.keys(raw).length) store.set('gz_devices', clean);   // nettoie les doublons existants
+  const list = Object.values(clean).sort((a, b) => b.last - a.last);
   const el = $('devList');
   if (!list.length) { el.innerHTML = `<div class="empty">${t('noKnown')}</div>`; return; }
   el.innerHTML = list.map(d => `
