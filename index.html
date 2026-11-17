@@ -45,7 +45,16 @@
   .alarmbadge.on{background:var(--bad);color:#fff}
   .bars{display:flex;gap:3px;align-items:flex-end;height:34px;margin-top:10px}
   .bars i{flex:1;background:var(--line);border-radius:2px}
-  canvas{width:100%;height:120px;display:block;margin-top:8px}
+  canvas{width:100%;height:170px;display:block;margin-top:8px;touch-action:pan-y;cursor:crosshair}
+  .chead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  #btnLive{background:var(--line);color:var(--mute)}
+  #btnLive.on{background:var(--bad);color:#fff}
+  #chartSlider{width:100%;margin:10px 0 4px;accent-color:var(--info)}
+  .zooms{display:flex;gap:6px}
+  .zooms button{flex:1}
+  .zooms button.on{background:var(--info);color:#0f172a}
+  #chartInfo b{color:var(--txt)}
+  .leaflet-tooltip.curtip{font-weight:600}
 
   .btns{display:flex;gap:10px;margin:12px 0}
   button{flex:1;font:inherit;font-size:16px;font-weight:600;padding:14px;border-radius:12px;border:0;cursor:pointer;color:#0f172a;background:var(--info)}
@@ -108,6 +117,9 @@
   .mapshown b{color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #btnLocate.on{background:#1e3a8a;color:#bfdbfe}
   .leaflet-container{font-family:inherit}
+  .langrow{align-items:center;flex-wrap:wrap}
+  .langrow label{margin:0 0 0 auto;flex:0 0 auto}
+  select{font:inherit;font-size:14px;color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 8px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
@@ -116,134 +128,144 @@
 <main>
   <header>
     <h1>Gazoscan <span id="appVersion" class="ver"></span></h1>
-    <span id="state" class="pill">Déconnecté</span>
+    <span id="state" class="pill"></span>
   </header>
 
   <div id="support" class="warnbox"></div>
 
   <!-- Mesure -->
   <section id="mainCard" class="card main">
-    <div class="lbl">Concentration</div>
+    <div class="lbl" data-i18n="concentration"></div>
     <div id="conc" class="conc idle">—</div>
     <div class="unit" id="unit"></div>
-    <div id="trigger" class="trigger">Gâchette : <b>—</b></div>
+    <div id="trigger" class="trigger"><span data-i18n="trigger"></span> : <b>—</b></div>
   </section>
 
   <!-- Surveillance -->
   <section class="card" id="missionCard">
     <div id="missionIdle">
-      <button id="btnStart" class="go full">Commencer la surveillance</button>
+      <button id="btnStart" class="go full" data-i18n="start"></button>
       <p class="hint" id="startHint"></p>
     </div>
     <div id="missionActive" hidden>
-      <div class="mhead"><b id="mName"></b><span class="rec">Surveillance</span></div>
+      <div class="mhead"><b id="mName"></b><span class="rec" data-i18n="recording"></span></div>
       <div class="stats">
-        <div><b id="sDur">0:00</b><span>Durée</span></div>
-        <div><b id="sDist">0 m</b><span>Distance</span></div>
-        <div><b id="sAlarms">0</b><span>Alarmes</span></div>
-        <div><b id="sIndices">0</b><span>Indices</span></div>
+        <div><b id="sDur">0:00</b><span data-i18n="duration"></span></div>
+        <div><b id="sDist">0 m</b><span data-i18n="distance"></span></div>
+        <div><b id="sAlarms">0</b><span data-i18n="alarms"></span></div>
+        <div><b id="sIndices">0</b><span data-i18n="indices"></span></div>
       </div>
-      <button id="btnIndice" class="danger full" disabled>Indice</button>
-      <p class="hint" id="gpsHint">GPS : en attente…</p>
-      <div class="btns" style="margin-bottom:0"><button id="btnStop" class="sec">Terminer la mission</button></div>
+      <button id="btnIndice" class="danger full" disabled></button>
+      <p class="hint" id="gpsHint" data-i18n="gpsWaiting"></p>
+      <div class="btns" style="margin-bottom:0"><button id="btnStop" class="sec" data-i18n="stop"></button></div>
     </div>
   </section>
 
   <!-- Carte -->
   <section class="card" id="mapCard">
-    <div id="mapShown" class="mapshown" hidden>Mission affichée : <b id="mapShownName"></b><button class="x" id="btnMapClose" title="Revenir à ma position">×</button></div>
+    <div id="mapShown" class="mapshown" hidden><span data-i18n="mapShown"></span> <b id="mapShownName"></b><button class="x" id="btnMapClose" data-i18n-title="backToMe">×</button></div>
     <div id="map"></div>
-    <div class="btns" style="margin-bottom:0"><button id="btnLocate" class="sec">📍 Me localiser</button></div>
-    <p class="hint" id="mapHint">Touche « Me localiser » pour afficher ta position.</p>
+    <div class="btns" style="margin-bottom:0"><button id="btnLocate" class="sec"></button></div>
+    <p class="hint" id="mapHint" data-i18n="mapHint"></p>
+  </section>
+
+  <!-- Courbe des mesures (revue dans le temps, liée à la carte) -->
+  <section class="card" id="chartCard">
+    <div class="chead"><div class="lbl" id="chartTitle" data-i18n="history"></div><button id="btnLive" class="small" data-i18n="chartLive"></button></div>
+    <canvas id="chart"></canvas>
+    <input type="range" id="chartSlider" min="0" max="1000" value="1000">
+    <div class="zooms">
+      <button class="small sec" data-span="60000">1 min</button>
+      <button class="small sec" data-span="300000">5 min</button>
+      <button class="small sec" data-span="900000">15 min</button>
+      <button class="small sec" data-span="0" data-i18n="chartAll"></button>
+    </div>
+    <p class="hint" id="chartInfo" data-i18n="chartHint"></p>
   </section>
 
   <div class="grid">
     <section class="card">
-      <div class="lbl">Max</div>
+      <div class="lbl" data-i18n="max"></div>
       <div class="val" id="max">—</div>
       <span id="alarm" class="alarmbadge">Alarme —</span>
     </section>
     <section class="card">
-      <div class="lbl">Intensité</div>
+      <div class="lbl" data-i18n="intensity"></div>
       <div class="val" id="intens">—</div>
       <div class="bars" id="bars"></div>
     </section>
   </div>
 
-  <section class="card">
-    <div class="lbl">Historique (60 s)</div>
-    <canvas id="chart"></canvas>
-  </section>
 
   <!-- Connexion -->
   <div class="btns">
-    <button id="btnConnect">Connecter</button>
-    <button id="btnDisconnect" class="sec" disabled>Déconnecter</button>
+    <button id="btnConnect" data-i18n="connect"></button>
+    <button id="btnDisconnect" class="sec" disabled data-i18n="disconnect"></button>
   </div>
 
-  <section class="card info" id="devinfo">Aucun appareil connecté.</section>
+  <section class="card info" id="devinfo" data-i18n="noDevice"></section>
 
   <section class="card">
-    <h2>Appareils déjà connectés</h2>
+    <h2 data-i18n="knownDevices"></h2>
     <div class="list" id="devList"></div>
   </section>
 
   <section class="card">
-    <h2>Missions</h2>
+    <h2 data-i18n="missions"></h2>
     <div class="list" id="missionList"></div>
   </section>
 
   <section class="card">
     <details>
-      <summary>Journal</summary>
+      <summary data-i18n="log"></summary>
       <div id="log"></div>
     </details>
-    <div class="btns" style="margin-bottom:0"><button id="btnDemo" class="sec small">Mode démo</button></div>
+    <div class="btns langrow" style="margin-bottom:0"><button id="btnDemo" class="sec small"></button><label for="langSel" data-i18n="language"></label><select id="langSel"></select></div>
   </section>
 </main>
 
 <!-- Démarrage de mission -->
 <div class="modal" id="dlgStart" hidden>
   <div class="sheet">
-    <h3>Nouvelle surveillance</h3>
-    <label for="fName">Nom de la mission</label>
-    <input id="fName" placeholder="Rue, secteur, n° d’intervention…">
-    <label for="fOp">Opérateur</label>
-    <input id="fOp" placeholder="Nom de l’opérateur">
-    <label for="fThr">Seuil d’alarme (<span class="u"></span>)</label>
-    <input id="fThr" type="number" inputmode="numeric" min="0" placeholder="Vide = alarme du Gazoscan">
-    <p class="hint">Un dépassement est détecté quand la concentration atteint ce seuil. S’il est vide, le seuil d’alarme réglé dans le Gazoscan est utilisé.</p>
-    <div class="btns"><button class="sec" data-close>Annuler</button><button class="go" id="btnStartOk">Démarrer</button></div>
+    <h3 data-i18n="newMission"></h3>
+    <label for="fName" data-i18n="missionName"></label>
+    <input id="fName" data-i18n-ph="missionNamePh">
+    <label for="fOp" data-i18n="operator"></label>
+    <input id="fOp" data-i18n-ph="operatorPh">
+    <label for="fThr"><span data-i18n="threshold"></span> (<span class="u"></span>)</label>
+    <input id="fThr" type="number" inputmode="numeric" min="0" data-i18n-ph="thresholdPh">
+    <p class="hint" data-i18n="thresholdHelp"></p>
+    <div class="btns"><button class="sec" data-close data-i18n="cancel"></button><button class="go" id="btnStartOk" data-i18n="startOk"></button></div>
   </div>
 </div>
 
 <!-- Indice -->
 <div class="modal" id="dlgIndice" hidden>
   <div class="sheet">
-    <h3 id="iTitle">Indice</h3>
+    <h3 id="iTitle"></h3>
     <div class="kv">
-      <span>Heure</span><b id="iTime"></b>
-      <span>Concentration</span><b id="iConc" class="hot"></b>
-      <span>Position</span><b id="iPos"></b>
+      <span data-i18n="time"></span><b id="iTime"></b>
+      <span data-i18n="concentration"></span><b id="iConc" class="hot"></b>
+      <span data-i18n="position"></span><b id="iPos"></b>
     </div>
-    <div class="btns"><button class="sec small" id="btnPosNow">Utiliser ma position actuelle</button></div>
-    <label for="iNote">Annotation</label>
-    <textarea id="iNote" placeholder="Description, repère, type d’ouvrage…"></textarea>
-    <label>Photos</label>
-    <label class="file">📷 Ajouter une photo<input id="iPhoto" type="file" accept="image/*" capture="environment"></label>
+    <div class="btns"><button class="sec small" id="btnPosNow" data-i18n="useMyPos"></button></div>
+    <label for="iNote" data-i18n="note"></label>
+    <textarea id="iNote" data-i18n-ph="notePh"></textarea>
+    <label data-i18n="photos"></label>
+    <label class="file"><span data-i18n="addPhoto"></span><input id="iPhoto" type="file" accept="image/*" capture="environment"></label>
     <div class="thumbs" id="iThumbs"></div>
-    <div class="btns"><button class="sec" data-close>Annuler</button><button class="danger" id="btnIndiceOk">Enregistrer l’indice</button></div>
+    <div class="btns"><button class="sec" data-close data-i18n="cancel"></button><button class="danger" id="btnIndiceOk" data-i18n="saveIndice"></button></div>
   </div>
 </div>
 
 <!-- Rapport -->
 <div class="modal" id="dlgReport" hidden>
   <div class="sheet">
-    <h3>Rapport PDF</h3>
+    <h3 data-i18n="pdfReport"></h3>
     <p class="info" id="rInfo"></p>
-    <button id="btnShare" class="full">Envoyer…</button>
-    <div class="btns"><button class="sec" id="btnResend" hidden>Renvoyer</button><button class="sec" id="btnDownload">Télécharger</button></div>
-    <div class="btns"><button class="sec" data-close>Fermer</button></div>
+    <button id="btnShare" class="full" data-i18n="send"></button>
+    <div class="btns"><button class="sec" id="btnResend" hidden data-i18n="resend"></button><button class="sec" id="btnDownload" data-i18n="download"></button></div>
+    <div class="btns"><button class="sec" data-close data-i18n="close"></button></div>
   </div>
 </div>
 
@@ -255,11 +277,10 @@ const SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';  // Transparent UAR
 const MEASURE_UUID = '49535343-1e4d-4bd9-ba61-23c647249616';  // notify : trames $…
 const SENDING_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';  // write  : commandes
 const NAME_PREFIXES = ['G', 'g'];  // (1) seuls les appareils dont le nom commence par G
-const APP_VERSION = '1.4.0';       // à incrémenter à chaque mise en ligne
+const APP_VERSION = '1.6.0';       // à incrémenter à chaque mise en ligne
 const APP_DATE = '16/11/2026';
 const UNIT = 'ppm·m';              // unité affichée (à adapter)
 const TRIGGER_TIMEOUT_MS = 1000;   // sans trame depuis 1 s => gâchette relâchée
-const HISTORY_MS = 60000;
 const ALARM_GAP_MS = 3000;         // au-delà, un nouveau dépassement compte comme une nouvelle alarme
 const REARM_MS = 5000;             // après un indice, une alarme toujours active redevient disponible après 5 s
 
@@ -268,15 +289,15 @@ const REARM_MS = 5000;             // après un indice, une alarme toujours acti
    ===================================================================== */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => n === null || n === undefined ? '—' : n.toLocaleString('fr-FR');
-const fmtDate = t => new Date(t).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-const fmtTime = t => new Date(t).toLocaleTimeString('fr-FR');
+const fmt = n => n === null || n === undefined ? '—' : n.toLocaleString(LOCALE);
+const fmtDate = t => new Date(t).toLocaleString(LOCALE, {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const fmtTime = t => new Date(t).toLocaleTimeString(LOCALE);
 const fmtDur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
   return h ? `${h} h ${String(m).padStart(2,'0')}` : `${m}:${String(s % 60).padStart(2,'0')}`; };
 const fmtDurLong = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
   return (h ? h + ' h ' : '') + m + ' min ' + (s % 60) + ' s'; };
-const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(2).replace('.', ',') + ' km';
-const fmtPos = p => p ? `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}` : 'indisponible';
+const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toLocaleString(LOCALE, { maximumFractionDigits: 2 }) + ' km';
+const fmtPos = p => p ? `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}` : t('unavailable');
 const mapUrl = p => `https://www.google.com/maps?q=${p.lat.toFixed(6)},${p.lon.toFixed(6)}`;
 function hav(a, b) {
   const R = 6371000, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
@@ -326,33 +347,955 @@ const db = (() => {
 })();
 
 /* =====================================================================
+   Langues : détection automatique (langue d'Android) + choix manuel
+   Pour ajouter une langue : copier le bloc "en" ci-dessous et le traduire.
+   ===================================================================== */
+const I18N = {
+ "fr": {
+  "state.idle": "Déconnecté",
+  "state.searching": "Recherche…",
+  "state.connecting": "Connexion…",
+  "state.connected": "Connecté",
+  "state.reconnecting": "Reconnexion…",
+  "state.failed": "Échec",
+  "state.demo": "Démo",
+  "docTitle": "Gazoscan v{v} – Surveillance",
+  "versionOf": "Version du {d}",
+  "concentration": "Concentration",
+  "trigger": "Gâchette",
+  "pressed": "appuyée",
+  "released": "relâchée",
+  "start": "Commencer la surveillance",
+  "recording": "Surveillance",
+  "duration": "Durée",
+  "distance": "Distance",
+  "alarms": "Alarmes",
+  "indices": "Indices",
+  "indice": "Indice",
+  "gpsWaiting": "GPS : en attente…",
+  "stop": "Terminer la mission",
+  "mapShown": "Mission affichée :",
+  "backToMe": "Revenir à ma position",
+  "locate": "📍 Me localiser",
+  "following": "📍 Suivi actif",
+  "recenter": "📍 Recentrer sur moi",
+  "mapHint": "Touche « Me localiser » pour afficher ta position.",
+  "max": "Max",
+  "intensity": "Intensité",
+  "history": "Historique des mesures",
+  "connect": "Connecter",
+  "disconnect": "Déconnecter",
+  "noDevice": "Aucun appareil connecté.",
+  "knownDevices": "Appareils déjà connectés",
+  "missions": "Missions",
+  "log": "Journal",
+  "demo": "Mode démo",
+  "stopDemo": "Arrêter la démo",
+  "language": "Langue",
+  "langAuto": "Automatique (Android)",
+  "newMission": "Nouvelle surveillance",
+  "missionName": "Nom de la mission",
+  "missionNamePh": "Rue, secteur, n° d’intervention…",
+  "operator": "Opérateur",
+  "operatorPh": "Nom de l’opérateur",
+  "threshold": "Seuil d’alarme",
+  "thresholdPh": "Vide = seuil du Gazoscan",
+  "thresholdHelp": "Un dépassement est détecté quand la concentration atteint ce seuil. S’il est vide, le seuil d’alarme réglé dans le Gazoscan est utilisé.",
+  "cancel": "Annuler",
+  "startOk": "Démarrer",
+  "time": "Heure",
+  "position": "Position",
+  "useMyPos": "Utiliser ma position actuelle",
+  "note": "Annotation",
+  "notePh": "Description, repère, type d’ouvrage…",
+  "photos": "Photos",
+  "addPhoto": "📷 Ajouter une photo",
+  "saveIndice": "Enregistrer l’indice",
+  "pdfReport": "Rapport PDF",
+  "send": "Envoyer…",
+  "resend": "Renvoyer",
+  "download": "Télécharger",
+  "close": "Fermer",
+  "needHttps": "Cette page doit être servie en HTTPS pour utiliser le Bluetooth et le GPS.",
+  "noBluetooth": "Web Bluetooth non disponible. Utilisez Chrome, Edge ou Samsung Internet sur Android (pas Firefox, pas iPhone).",
+  "unnamed": "(sans nom)",
+  "noKnown": "Aucun appareil pour l’instant.",
+  "lastConn": "Dernière connexion : {d}",
+  "connCount": "{n} connexion(s)",
+  "forget": "Oublier",
+  "timeout": "{w} : délai dépassé",
+  "logSelCancel": "Sélection annulée : {e}",
+  "logKnown": "Appareil autorisé retrouvé, connexion directe.",
+  "logDevice": "Appareil : {n} [{id}]",
+  "logConnected": "Connecté, notifications actives.",
+  "logFail": "Échec : {e}",
+  "logLost": "Liaison perdue.",
+  "logRetry": "Nouvelle tentative dans {s} s…",
+  "logNoDevInfo": "Service Device Information non lisible.",
+  "logMsg": "Message : {m}",
+  "logShortFrame": "Trame incomplète : {f}",
+  "logBadFrame": "Trame invalide : {f}",
+  "logFrame": "Trame : {f}  (conc {c}, max {m}, alarme {a}, intensité {i})",
+  "logSaveErr": "Sauvegarde impossible : {e}",
+  "logStarted": "Surveillance démarrée : {n}",
+  "logAlarm": "Alarme n°{n} : {c}",
+  "logEnded": "Surveillance terminée.",
+  "logResumed": "Surveillance en cours reprise.",
+  "logIndice": "Indice n°{n} enregistré.",
+  "logReportErr": "Erreur rapport : {e}",
+  "logSent": "Rapport envoyé : {n}",
+  "logShareErr": "Partage impossible : {e}",
+  "logOsmNone": "Fond de carte OSM indisponible pour le PDF.",
+  "logOsm": "Fond de carte OSM : {e}",
+  "dev.Appareil": "Appareil",
+  "dev.Fabricant": "Fabricant",
+  "dev.Modèle": "Modèle",
+  "dev.Matériel": "Matériel",
+  "dev.Firmware": "Firmware",
+  "dev.Logiciel": "Logiciel",
+  "thrNone": "Seuil d’alarme —",
+  "thr": "Seuil {v}",
+  "exceeded": "DÉPASSÉ",
+  "gpsNone": "GPS indisponible sur ce navigateur.",
+  "gpsSearching": "GPS : recherche de la position…",
+  "gpsPos": "GPS : {p} (± {a} m)",
+  "gpsDenied": "GPS refusé : autorisez la localisation pour ce site dans Chrome.",
+  "gpsErr": "GPS : {e}",
+  "mapOff": "Carte indisponible : pas de connexion internet au chargement de la page.",
+  "alarmN": "Alarme n°{n}",
+  "indiceN": "Indice n°{n}",
+  "nShort": "n°{n}",
+  "startHintLive": "Enregistre le trajet GPS et les dépassements d’alarme, puis génère un rapport PDF.",
+  "startHintIdle": "Connecte le Gazoscan pour détecter les alarmes. Le trajet GPS est enregistré dans tous les cas.",
+  "missionDefault": "Mission du {d}",
+  "indiceAvail": "Indice disponible : {c}",
+  "indiceWait": "Indice (en attente d’un dépassement)",
+  "confirmStop": "Terminer la surveillance et générer le rapport ?",
+  "noPosYet": "Position GPS pas encore disponible.",
+  "unavailable": "indisponible",
+  "badPhoto": "Photo illisible : {e}",
+  "badFormat": "format non pris en charge",
+  "noMissions": "Aucune mission terminée.",
+  "counts": "{a} alarme(s) · {i} indice(s)",
+  "sentShort": "✓ envoyé",
+  "map": "Carte",
+  "delete": "Supprimer",
+  "confirmDel": "Supprimer définitivement cette mission et ses photos ?",
+  "reportFile": "Rapport_Gazoscan",
+  "generating": "Génération du rapport…",
+  "generatingMap": "Génération du rapport et du fond de carte…",
+  "reportErr": "Impossible de générer le rapport : {e}",
+  "alreadySent": "✓ Déjà envoyé le {d}",
+  "shareTitle": "Rapport Gazoscan – {n}",
+  "shareText": "Rapport de surveillance Gazoscan : {n} ({d})",
+  "confirmResend": "Ce rapport a déjà été envoyé le {d}. L’envoyer à nouveau ?",
+  "rTitle": "Rapport de surveillance Gazoscan",
+  "maxConc": "Concentration max",
+  "rMission": "Mission",
+  "rStart": "Début",
+  "rEnd": "Fin",
+  "rMakerModel": "Fabricant / modèle",
+  "rFwSw": "Firmware / logiciel",
+  "rDetection": "Détection",
+  "detUser": "Concentration >= {v} (seuil saisi)",
+  "detDevice": "Concentration >= seuil d’alarme du Gazoscan",
+  "rGpsPts": "Points GPS",
+  "plan": "Plan du parcours",
+  "noGps": "Aucune position GPS enregistrée pendant la mission.",
+  "osmAttr": "© contributeurs OpenStreetMap",
+  "north": "N",
+  "legTrack": "Trajet",
+  "legStart": "Départ",
+  "legEnd": "Arrivée",
+  "legAlarm": "Alarme sans indice",
+  "alarmsDetected": "Alarmes détectées ({n})",
+  "noAlarms": "Aucun dépassement d’alarme pendant la mission.",
+  "colN": "N°",
+  "colPos": "Position GPS",
+  "noPos": "position indisponible",
+  "indicesTitle": "Indices ({n})",
+  "noIndices": "Aucun indice enregistré.",
+  "dateTime": "Date et heure",
+  "at": "{d} à {t}",
+  "alarm": "Alarme",
+  "openMap": "{p} (± {a} m) – ouvrir la carte",
+  "generated": "Généré le {d} par Gazoscan Web v{v}",
+  "page": "Page {i} / {n}",
+  "chartLive": "● Direct",
+  "chartAll": "Tout",
+  "chartHint": "Touche la courbe (ou le trajet sur la carte) pour voir où une mesure a été prise. Le curseur sous la courbe permet de revenir en arrière.",
+  "cursorInfo": "{t} · {c} · {p}",
+  "posUnknown": "position inconnue",
+  "noSamples": "Pas de mesures enregistrées pour cette mission.",
+  "chartMission": "Mission : {n}"
+ },
+ "en": {
+  "state.idle": "Disconnected",
+  "state.searching": "Searching…",
+  "state.connecting": "Connecting…",
+  "state.connected": "Connected",
+  "state.reconnecting": "Reconnecting…",
+  "state.failed": "Failed",
+  "state.demo": "Demo",
+  "docTitle": "Gazoscan v{v} – Monitoring",
+  "versionOf": "Version of {d}",
+  "concentration": "Concentration",
+  "trigger": "Trigger",
+  "pressed": "pressed",
+  "released": "released",
+  "start": "Start monitoring",
+  "recording": "Monitoring",
+  "duration": "Duration",
+  "distance": "Distance",
+  "alarms": "Alarms",
+  "indices": "Leaks",
+  "indice": "Leak",
+  "gpsWaiting": "GPS: waiting…",
+  "stop": "End mission",
+  "mapShown": "Mission shown:",
+  "backToMe": "Back to my position",
+  "locate": "📍 Locate me",
+  "following": "📍 Following",
+  "recenter": "📍 Recenter on me",
+  "mapHint": "Tap “Locate me” to show your position.",
+  "max": "Max",
+  "intensity": "Intensity",
+  "history": "Measurement history",
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "noDevice": "No device connected.",
+  "knownDevices": "Previously connected devices",
+  "missions": "Missions",
+  "log": "Log",
+  "demo": "Demo mode",
+  "stopDemo": "Stop demo",
+  "language": "Language",
+  "langAuto": "Automatic (Android)",
+  "newMission": "New monitoring",
+  "missionName": "Mission name",
+  "missionNamePh": "Street, area, job number…",
+  "operator": "Operator",
+  "operatorPh": "Operator name",
+  "threshold": "Alarm threshold",
+  "thresholdPh": "Empty = Gazoscan threshold",
+  "thresholdHelp": "An alarm is detected when the concentration reaches this threshold. If empty, the alarm threshold set in the Gazoscan is used.",
+  "cancel": "Cancel",
+  "startOk": "Start",
+  "time": "Time",
+  "position": "Position",
+  "useMyPos": "Use my current position",
+  "note": "Note",
+  "notePh": "Description, landmark, type of structure…",
+  "photos": "Photos",
+  "addPhoto": "📷 Add a photo",
+  "saveIndice": "Save leak",
+  "pdfReport": "PDF report",
+  "send": "Send…",
+  "resend": "Send again",
+  "download": "Download",
+  "close": "Close",
+  "needHttps": "This page must be served over HTTPS to use Bluetooth and GPS.",
+  "noBluetooth": "Web Bluetooth not available. Use Chrome, Edge or Samsung Internet on Android (not Firefox, not iPhone).",
+  "unnamed": "(no name)",
+  "noKnown": "No device yet.",
+  "lastConn": "Last connection: {d}",
+  "connCount": "{n} connection(s)",
+  "forget": "Forget",
+  "timeout": "{w}: timed out",
+  "logSelCancel": "Selection cancelled: {e}",
+  "logKnown": "Authorised device found, connecting directly.",
+  "logDevice": "Device: {n} [{id}]",
+  "logConnected": "Connected, notifications active.",
+  "logFail": "Failed: {e}",
+  "logLost": "Connection lost.",
+  "logRetry": "Retrying in {s} s…",
+  "logNoDevInfo": "Device Information service not readable.",
+  "logMsg": "Message: {m}",
+  "logShortFrame": "Incomplete frame: {f}",
+  "logBadFrame": "Invalid frame: {f}",
+  "logFrame": "Frame: {f}  (conc {c}, max {m}, alarm {a}, intensity {i})",
+  "logSaveErr": "Could not save: {e}",
+  "logStarted": "Monitoring started: {n}",
+  "logAlarm": "Alarm #{n}: {c}",
+  "logEnded": "Monitoring ended.",
+  "logResumed": "Ongoing monitoring resumed.",
+  "logIndice": "Leak #{n} saved.",
+  "logReportErr": "Report error: {e}",
+  "logSent": "Report sent: {n}",
+  "logShareErr": "Sharing failed: {e}",
+  "logOsmNone": "OSM base map unavailable for the PDF.",
+  "logOsm": "OSM base map: {e}",
+  "dev.Appareil": "Device",
+  "dev.Fabricant": "Manufacturer",
+  "dev.Modèle": "Model",
+  "dev.Matériel": "Hardware",
+  "dev.Firmware": "Firmware",
+  "dev.Logiciel": "Software",
+  "thrNone": "Alarm threshold —",
+  "thr": "Threshold {v}",
+  "exceeded": "EXCEEDED",
+  "gpsNone": "GPS not available in this browser.",
+  "gpsSearching": "GPS: searching for position…",
+  "gpsPos": "GPS: {p} (± {a} m)",
+  "gpsDenied": "GPS denied: allow location for this site in Chrome.",
+  "gpsErr": "GPS: {e}",
+  "mapOff": "Map unavailable: no internet connection when the page loaded.",
+  "alarmN": "Alarm #{n}",
+  "indiceN": "Leak #{n}",
+  "nShort": "#{n}",
+  "startHintLive": "Records the GPS track and alarm events, then generates a PDF report.",
+  "startHintIdle": "Connect the Gazoscan to detect alarms. The GPS track is recorded in any case.",
+  "missionDefault": "Mission of {d}",
+  "indiceAvail": "Leak available: {c}",
+  "indiceWait": "Leak (waiting for an alarm)",
+  "confirmStop": "End monitoring and generate the report?",
+  "noPosYet": "GPS position not available yet.",
+  "unavailable": "unavailable",
+  "badPhoto": "Unreadable photo: {e}",
+  "badFormat": "unsupported format",
+  "noMissions": "No completed mission.",
+  "counts": "{a} alarm(s) · {i} leak(s)",
+  "sentShort": "✓ sent",
+  "map": "Map",
+  "delete": "Delete",
+  "confirmDel": "Permanently delete this mission and its photos?",
+  "reportFile": "Gazoscan_Report",
+  "generating": "Generating report…",
+  "generatingMap": "Generating report and base map…",
+  "reportErr": "Unable to generate the report: {e}",
+  "alreadySent": "✓ Already sent on {d}",
+  "shareTitle": "Gazoscan report – {n}",
+  "shareText": "Gazoscan monitoring report: {n} ({d})",
+  "confirmResend": "This report was already sent on {d}. Send it again?",
+  "rTitle": "Gazoscan monitoring report",
+  "maxConc": "Max concentration",
+  "rMission": "Mission",
+  "rStart": "Start",
+  "rEnd": "End",
+  "rMakerModel": "Manufacturer / model",
+  "rFwSw": "Firmware / software",
+  "rDetection": "Detection",
+  "detUser": "Concentration >= {v} (entered threshold)",
+  "detDevice": "Concentration >= Gazoscan alarm threshold",
+  "rGpsPts": "GPS points",
+  "plan": "Route map",
+  "noGps": "No GPS position recorded during the mission.",
+  "osmAttr": "© OpenStreetMap contributors",
+  "north": "N",
+  "legTrack": "Track",
+  "legStart": "Start",
+  "legEnd": "End",
+  "legAlarm": "Alarm without leak",
+  "alarmsDetected": "Detected alarms ({n})",
+  "noAlarms": "No alarm during the mission.",
+  "colN": "#",
+  "colPos": "GPS position",
+  "noPos": "position unavailable",
+  "indicesTitle": "Leaks ({n})",
+  "noIndices": "No leak recorded.",
+  "dateTime": "Date and time",
+  "at": "{d} at {t}",
+  "alarm": "Alarm",
+  "openMap": "{p} (± {a} m) – open map",
+  "generated": "Generated on {d} by Gazoscan Web v{v}",
+  "page": "Page {i} / {n}",
+  "chartLive": "● Live",
+  "chartAll": "All",
+  "chartHint": "Tap the curve (or the track on the map) to see where a measurement was taken. Use the slider below the curve to go back in time.",
+  "cursorInfo": "{t} · {c} · {p}",
+  "posUnknown": "position unknown",
+  "noSamples": "No measurements recorded for this mission.",
+  "chartMission": "Mission: {n}"
+ },
+ "de": {
+  "state.idle": "Getrennt",
+  "state.searching": "Suche…",
+  "state.connecting": "Verbinden…",
+  "state.connected": "Verbunden",
+  "state.reconnecting": "Neu verbinden…",
+  "state.failed": "Fehler",
+  "state.demo": "Demo",
+  "docTitle": "Gazoscan v{v} – Überwachung",
+  "versionOf": "Version vom {d}",
+  "concentration": "Konzentration",
+  "trigger": "Auslöser",
+  "pressed": "gedrückt",
+  "released": "losgelassen",
+  "start": "Überwachung starten",
+  "recording": "Überwachung",
+  "duration": "Dauer",
+  "distance": "Strecke",
+  "alarms": "Alarme",
+  "indices": "Hinweise",
+  "indice": "Hinweis",
+  "gpsWaiting": "GPS: warten…",
+  "stop": "Einsatz beenden",
+  "mapShown": "Angezeigter Einsatz:",
+  "backToMe": "Zurück zu meiner Position",
+  "locate": "📍 Mich orten",
+  "following": "📍 Verfolgung aktiv",
+  "recenter": "📍 Auf mich zentrieren",
+  "mapHint": "Tippe auf „Mich orten“, um deine Position anzuzeigen.",
+  "max": "Max",
+  "intensity": "Intensität",
+  "history": "Messverlauf",
+  "connect": "Verbinden",
+  "disconnect": "Trennen",
+  "noDevice": "Kein Gerät verbunden.",
+  "knownDevices": "Bereits verbundene Geräte",
+  "missions": "Einsätze",
+  "log": "Protokoll",
+  "demo": "Demomodus",
+  "stopDemo": "Demo beenden",
+  "language": "Sprache",
+  "langAuto": "Automatisch (Android)",
+  "newMission": "Neue Überwachung",
+  "missionName": "Name des Einsatzes",
+  "missionNamePh": "Straße, Gebiet, Auftragsnummer…",
+  "operator": "Bediener",
+  "operatorPh": "Name des Bedieners",
+  "threshold": "Alarmschwelle",
+  "thresholdPh": "Leer = Gazoscan-Schwelle",
+  "thresholdHelp": "Eine Überschreitung wird erkannt, wenn die Konzentration diese Schwelle erreicht. Ist das Feld leer, gilt die im Gazoscan eingestellte Alarmschwelle.",
+  "cancel": "Abbrechen",
+  "startOk": "Starten",
+  "time": "Uhrzeit",
+  "position": "Position",
+  "useMyPos": "Aktuelle Position verwenden",
+  "note": "Notiz",
+  "notePh": "Beschreibung, Orientierungspunkt, Bauwerkstyp…",
+  "photos": "Fotos",
+  "addPhoto": "📷 Foto hinzufügen",
+  "saveIndice": "Hinweis speichern",
+  "pdfReport": "PDF-Bericht",
+  "send": "Senden…",
+  "resend": "Erneut senden",
+  "download": "Herunterladen",
+  "close": "Schließen",
+  "needHttps": "Diese Seite muss über HTTPS geladen werden, um Bluetooth und GPS zu nutzen.",
+  "noBluetooth": "Web Bluetooth nicht verfügbar. Verwende Chrome, Edge oder Samsung Internet auf Android (nicht Firefox, nicht iPhone).",
+  "unnamed": "(ohne Namen)",
+  "noKnown": "Noch kein Gerät.",
+  "lastConn": "Letzte Verbindung: {d}",
+  "connCount": "{n} Verbindung(en)",
+  "forget": "Vergessen",
+  "timeout": "{w}: Zeitüberschreitung",
+  "logSelCancel": "Auswahl abgebrochen: {e}",
+  "logKnown": "Autorisiertes Gerät gefunden, direkte Verbindung.",
+  "logDevice": "Gerät: {n} [{id}]",
+  "logConnected": "Verbunden, Benachrichtigungen aktiv.",
+  "logFail": "Fehler: {e}",
+  "logLost": "Verbindung verloren.",
+  "logRetry": "Neuer Versuch in {s} s…",
+  "logNoDevInfo": "Dienst „Device Information“ nicht lesbar.",
+  "logMsg": "Nachricht: {m}",
+  "logShortFrame": "Unvollständiger Datensatz: {f}",
+  "logBadFrame": "Ungültiger Datensatz: {f}",
+  "logFrame": "Datensatz: {f}  (Konz. {c}, max {m}, Alarm {a}, Intensität {i})",
+  "logSaveErr": "Speichern nicht möglich: {e}",
+  "logStarted": "Überwachung gestartet: {n}",
+  "logAlarm": "Alarm Nr. {n}: {c}",
+  "logEnded": "Überwachung beendet.",
+  "logResumed": "Laufende Überwachung fortgesetzt.",
+  "logIndice": "Hinweis Nr. {n} gespeichert.",
+  "logReportErr": "Berichtsfehler: {e}",
+  "logSent": "Bericht gesendet: {n}",
+  "logShareErr": "Teilen nicht möglich: {e}",
+  "logOsmNone": "OSM-Hintergrundkarte für das PDF nicht verfügbar.",
+  "logOsm": "OSM-Hintergrundkarte: {e}",
+  "dev.Appareil": "Gerät",
+  "dev.Fabricant": "Hersteller",
+  "dev.Modèle": "Modell",
+  "dev.Matériel": "Hardware",
+  "dev.Firmware": "Firmware",
+  "dev.Logiciel": "Software",
+  "thrNone": "Alarmschwelle —",
+  "thr": "Schwelle {v}",
+  "exceeded": "ÜBERSCHRITTEN",
+  "gpsNone": "GPS in diesem Browser nicht verfügbar.",
+  "gpsSearching": "GPS: Position wird gesucht…",
+  "gpsPos": "GPS: {p} (± {a} m)",
+  "gpsDenied": "GPS verweigert: Standortzugriff für diese Seite in Chrome erlauben.",
+  "gpsErr": "GPS: {e}",
+  "mapOff": "Karte nicht verfügbar: keine Internetverbindung beim Laden der Seite.",
+  "alarmN": "Alarm Nr. {n}",
+  "indiceN": "Hinweis Nr. {n}",
+  "nShort": "Nr. {n}",
+  "startHintLive": "Zeichnet die GPS-Strecke und Alarmüberschreitungen auf und erstellt dann einen PDF-Bericht.",
+  "startHintIdle": "Verbinde den Gazoscan, um Alarme zu erkennen. Die GPS-Strecke wird in jedem Fall aufgezeichnet.",
+  "missionDefault": "Einsatz vom {d}",
+  "indiceAvail": "Hinweis verfügbar: {c}",
+  "indiceWait": "Hinweis (wartet auf Überschreitung)",
+  "confirmStop": "Überwachung beenden und Bericht erstellen?",
+  "noPosYet": "GPS-Position noch nicht verfügbar.",
+  "unavailable": "nicht verfügbar",
+  "badPhoto": "Foto nicht lesbar: {e}",
+  "badFormat": "Format nicht unterstützt",
+  "noMissions": "Kein abgeschlossener Einsatz.",
+  "counts": "{a} Alarm(e) · {i} Hinweis(e)",
+  "sentShort": "✓ gesendet",
+  "map": "Karte",
+  "delete": "Löschen",
+  "confirmDel": "Diesen Einsatz und seine Fotos endgültig löschen?",
+  "reportFile": "Gazoscan_Bericht",
+  "generating": "Bericht wird erstellt…",
+  "generatingMap": "Bericht und Hintergrundkarte werden erstellt…",
+  "reportErr": "Bericht kann nicht erstellt werden: {e}",
+  "alreadySent": "✓ Bereits gesendet am {d}",
+  "shareTitle": "Gazoscan-Bericht – {n}",
+  "shareText": "Gazoscan-Überwachungsbericht: {n} ({d})",
+  "confirmResend": "Dieser Bericht wurde bereits am {d} gesendet. Erneut senden?",
+  "rTitle": "Gazoscan-Überwachungsbericht",
+  "maxConc": "Max. Konzentration",
+  "rMission": "Einsatz",
+  "rStart": "Beginn",
+  "rEnd": "Ende",
+  "rMakerModel": "Hersteller / Modell",
+  "rFwSw": "Firmware / Software",
+  "rDetection": "Erkennung",
+  "detUser": "Konzentration >= {v} (eingegebene Schwelle)",
+  "detDevice": "Konzentration >= Gazoscan-Alarmschwelle",
+  "rGpsPts": "GPS-Punkte",
+  "plan": "Streckenplan",
+  "noGps": "Während des Einsatzes wurde keine GPS-Position aufgezeichnet.",
+  "osmAttr": "© OpenStreetMap-Mitwirkende",
+  "north": "N",
+  "legTrack": "Strecke",
+  "legStart": "Start",
+  "legEnd": "Ziel",
+  "legAlarm": "Alarm ohne Hinweis",
+  "alarmsDetected": "Erkannte Alarme ({n})",
+  "noAlarms": "Keine Alarmüberschreitung während des Einsatzes.",
+  "colN": "Nr.",
+  "colPos": "GPS-Position",
+  "noPos": "Position nicht verfügbar",
+  "indicesTitle": "Hinweise ({n})",
+  "noIndices": "Kein Hinweis gespeichert.",
+  "dateTime": "Datum und Uhrzeit",
+  "at": "{d} um {t}",
+  "alarm": "Alarm",
+  "openMap": "{p} (± {a} m) – Karte öffnen",
+  "generated": "Erstellt am {d} mit Gazoscan Web v{v}",
+  "page": "Seite {i} / {n}",
+  "chartLive": "● Live",
+  "chartAll": "Alle",
+  "chartHint": "Tippe auf die Kurve (oder die Strecke auf der Karte), um zu sehen, wo ein Messwert aufgenommen wurde. Mit dem Schieberegler unter der Kurve gehst du zurück.",
+  "cursorInfo": "{t} · {c} · {p}",
+  "posUnknown": "Position unbekannt",
+  "noSamples": "Für diesen Einsatz wurden keine Messwerte gespeichert.",
+  "chartMission": "Einsatz: {n}"
+ },
+ "es": {
+  "state.idle": "Desconectado",
+  "state.searching": "Buscando…",
+  "state.connecting": "Conectando…",
+  "state.connected": "Conectado",
+  "state.reconnecting": "Reconectando…",
+  "state.failed": "Error",
+  "state.demo": "Demo",
+  "docTitle": "Gazoscan v{v} – Vigilancia",
+  "versionOf": "Versión del {d}",
+  "concentration": "Concentración",
+  "trigger": "Gatillo",
+  "pressed": "pulsado",
+  "released": "soltado",
+  "start": "Iniciar vigilancia",
+  "recording": "Vigilancia",
+  "duration": "Duración",
+  "distance": "Distancia",
+  "alarms": "Alarmas",
+  "indices": "Indicios",
+  "indice": "Indicio",
+  "gpsWaiting": "GPS: esperando…",
+  "stop": "Finalizar misión",
+  "mapShown": "Misión mostrada:",
+  "backToMe": "Volver a mi posición",
+  "locate": "📍 Localizarme",
+  "following": "📍 Seguimiento activo",
+  "recenter": "📍 Centrar en mí",
+  "mapHint": "Pulsa «Localizarme» para ver tu posición.",
+  "max": "Máx",
+  "intensity": "Intensidad",
+  "history": "Historial de mediciones",
+  "connect": "Conectar",
+  "disconnect": "Desconectar",
+  "noDevice": "Ningún dispositivo conectado.",
+  "knownDevices": "Dispositivos ya conectados",
+  "missions": "Misiones",
+  "log": "Registro",
+  "demo": "Modo demo",
+  "stopDemo": "Detener demo",
+  "language": "Idioma",
+  "langAuto": "Automático (Android)",
+  "newMission": "Nueva vigilancia",
+  "missionName": "Nombre de la misión",
+  "missionNamePh": "Calle, sector, n.º de intervención…",
+  "operator": "Operador",
+  "operatorPh": "Nombre del operador",
+  "threshold": "Umbral de alarma",
+  "thresholdPh": "Vacío = umbral del Gazoscan",
+  "thresholdHelp": "Se detecta una superación cuando la concentración alcanza este umbral. Si está vacío, se usa el umbral de alarma configurado en el Gazoscan.",
+  "cancel": "Cancelar",
+  "startOk": "Iniciar",
+  "time": "Hora",
+  "position": "Posición",
+  "useMyPos": "Usar mi posición actual",
+  "note": "Anotación",
+  "notePh": "Descripción, referencia, tipo de instalación…",
+  "photos": "Fotos",
+  "addPhoto": "📷 Añadir una foto",
+  "saveIndice": "Guardar indicio",
+  "pdfReport": "Informe PDF",
+  "send": "Enviar…",
+  "resend": "Reenviar",
+  "download": "Descargar",
+  "close": "Cerrar",
+  "needHttps": "Esta página debe servirse por HTTPS para usar Bluetooth y GPS.",
+  "noBluetooth": "Web Bluetooth no disponible. Usa Chrome, Edge o Samsung Internet en Android (no Firefox, no iPhone).",
+  "unnamed": "(sin nombre)",
+  "noKnown": "Ningún dispositivo por ahora.",
+  "lastConn": "Última conexión: {d}",
+  "connCount": "{n} conexión(es)",
+  "forget": "Olvidar",
+  "timeout": "{w}: tiempo agotado",
+  "logSelCancel": "Selección cancelada: {e}",
+  "logKnown": "Dispositivo autorizado encontrado, conexión directa.",
+  "logDevice": "Dispositivo: {n} [{id}]",
+  "logConnected": "Conectado, notificaciones activas.",
+  "logFail": "Error: {e}",
+  "logLost": "Conexión perdida.",
+  "logRetry": "Nuevo intento en {s} s…",
+  "logNoDevInfo": "Servicio Device Information no legible.",
+  "logMsg": "Mensaje: {m}",
+  "logShortFrame": "Trama incompleta: {f}",
+  "logBadFrame": "Trama no válida: {f}",
+  "logFrame": "Trama: {f}  (conc {c}, máx {m}, alarma {a}, intensidad {i})",
+  "logSaveErr": "No se pudo guardar: {e}",
+  "logStarted": "Vigilancia iniciada: {n}",
+  "logAlarm": "Alarma n.º {n}: {c}",
+  "logEnded": "Vigilancia finalizada.",
+  "logResumed": "Vigilancia en curso reanudada.",
+  "logIndice": "Indicio n.º {n} guardado.",
+  "logReportErr": "Error del informe: {e}",
+  "logSent": "Informe enviado: {n}",
+  "logShareErr": "No se pudo compartir: {e}",
+  "logOsmNone": "Mapa base OSM no disponible para el PDF.",
+  "logOsm": "Mapa base OSM: {e}",
+  "dev.Appareil": "Dispositivo",
+  "dev.Fabricant": "Fabricante",
+  "dev.Modèle": "Modelo",
+  "dev.Matériel": "Hardware",
+  "dev.Firmware": "Firmware",
+  "dev.Logiciel": "Software",
+  "thrNone": "Umbral de alarma —",
+  "thr": "Umbral {v}",
+  "exceeded": "SUPERADO",
+  "gpsNone": "GPS no disponible en este navegador.",
+  "gpsSearching": "GPS: buscando la posición…",
+  "gpsPos": "GPS: {p} (± {a} m)",
+  "gpsDenied": "GPS denegado: permite la ubicación para este sitio en Chrome.",
+  "gpsErr": "GPS: {e}",
+  "mapOff": "Mapa no disponible: sin conexión a internet al cargar la página.",
+  "alarmN": "Alarma n.º {n}",
+  "indiceN": "Indicio n.º {n}",
+  "nShort": "n.º {n}",
+  "startHintLive": "Registra el recorrido GPS y las superaciones de alarma, y luego genera un informe PDF.",
+  "startHintIdle": "Conecta el Gazoscan para detectar alarmas. El recorrido GPS se registra en todo caso.",
+  "missionDefault": "Misión del {d}",
+  "indiceAvail": "Indicio disponible: {c}",
+  "indiceWait": "Indicio (esperando una superación)",
+  "confirmStop": "¿Finalizar la vigilancia y generar el informe?",
+  "noPosYet": "Posición GPS aún no disponible.",
+  "unavailable": "no disponible",
+  "badPhoto": "Foto ilegible: {e}",
+  "badFormat": "formato no compatible",
+  "noMissions": "Ninguna misión finalizada.",
+  "counts": "{a} alarma(s) · {i} indicio(s)",
+  "sentShort": "✓ enviado",
+  "map": "Mapa",
+  "delete": "Eliminar",
+  "confirmDel": "¿Eliminar definitivamente esta misión y sus fotos?",
+  "reportFile": "Informe_Gazoscan",
+  "generating": "Generando el informe…",
+  "generatingMap": "Generando el informe y el mapa base…",
+  "reportErr": "No se puede generar el informe: {e}",
+  "alreadySent": "✓ Ya enviado el {d}",
+  "shareTitle": "Informe Gazoscan – {n}",
+  "shareText": "Informe de vigilancia Gazoscan: {n} ({d})",
+  "confirmResend": "Este informe ya se envió el {d}. ¿Enviarlo de nuevo?",
+  "rTitle": "Informe de vigilancia Gazoscan",
+  "maxConc": "Concentración máx.",
+  "rMission": "Misión",
+  "rStart": "Inicio",
+  "rEnd": "Fin",
+  "rMakerModel": "Fabricante / modelo",
+  "rFwSw": "Firmware / software",
+  "rDetection": "Detección",
+  "detUser": "Concentración >= {v} (umbral introducido)",
+  "detDevice": "Concentración >= umbral de alarma del Gazoscan",
+  "rGpsPts": "Puntos GPS",
+  "plan": "Plano del recorrido",
+  "noGps": "No se registró ninguna posición GPS durante la misión.",
+  "osmAttr": "© colaboradores de OpenStreetMap",
+  "north": "N",
+  "legTrack": "Recorrido",
+  "legStart": "Salida",
+  "legEnd": "Llegada",
+  "legAlarm": "Alarma sin indicio",
+  "alarmsDetected": "Alarmas detectadas ({n})",
+  "noAlarms": "Ninguna superación de alarma durante la misión.",
+  "colN": "N.º",
+  "colPos": "Posición GPS",
+  "noPos": "posición no disponible",
+  "indicesTitle": "Indicios ({n})",
+  "noIndices": "Ningún indicio registrado.",
+  "dateTime": "Fecha y hora",
+  "at": "{d} a las {t}",
+  "alarm": "Alarma",
+  "openMap": "{p} (± {a} m) – abrir mapa",
+  "generated": "Generado el {d} por Gazoscan Web v{v}",
+  "page": "Página {i} / {n}",
+  "chartLive": "● En directo",
+  "chartAll": "Todo",
+  "chartHint": "Toca la curva (o el recorrido en el mapa) para ver dónde se tomó una medición. El cursor bajo la curva permite retroceder.",
+  "cursorInfo": "{t} · {c} · {p}",
+  "posUnknown": "posición desconocida",
+  "noSamples": "No hay mediciones registradas para esta misión.",
+  "chartMission": "Misión: {n}"
+ },
+ "it": {
+  "state.idle": "Disconnesso",
+  "state.searching": "Ricerca…",
+  "state.connecting": "Connessione…",
+  "state.connected": "Connesso",
+  "state.reconnecting": "Riconnessione…",
+  "state.failed": "Errore",
+  "state.demo": "Demo",
+  "docTitle": "Gazoscan v{v} – Sorveglianza",
+  "versionOf": "Versione del {d}",
+  "concentration": "Concentrazione",
+  "trigger": "Grilletto",
+  "pressed": "premuto",
+  "released": "rilasciato",
+  "start": "Avvia sorveglianza",
+  "recording": "Sorveglianza",
+  "duration": "Durata",
+  "distance": "Distanza",
+  "alarms": "Allarmi",
+  "indices": "Indizi",
+  "indice": "Indizio",
+  "gpsWaiting": "GPS: in attesa…",
+  "stop": "Termina missione",
+  "mapShown": "Missione visualizzata:",
+  "backToMe": "Torna alla mia posizione",
+  "locate": "📍 Localizzami",
+  "following": "📍 Inseguimento attivo",
+  "recenter": "📍 Centra su di me",
+  "mapHint": "Tocca «Localizzami» per vedere la tua posizione.",
+  "max": "Max",
+  "intensity": "Intensità",
+  "history": "Storico delle misure",
+  "connect": "Connetti",
+  "disconnect": "Disconnetti",
+  "noDevice": "Nessun dispositivo connesso.",
+  "knownDevices": "Dispositivi già connessi",
+  "missions": "Missioni",
+  "log": "Registro",
+  "demo": "Modalità demo",
+  "stopDemo": "Ferma demo",
+  "language": "Lingua",
+  "langAuto": "Automatica (Android)",
+  "newMission": "Nuova sorveglianza",
+  "missionName": "Nome della missione",
+  "missionNamePh": "Via, settore, n. intervento…",
+  "operator": "Operatore",
+  "operatorPh": "Nome dell’operatore",
+  "threshold": "Soglia di allarme",
+  "thresholdPh": "Vuoto = soglia del Gazoscan",
+  "thresholdHelp": "Un superamento viene rilevato quando la concentrazione raggiunge questa soglia. Se vuoto, si usa la soglia di allarme impostata nel Gazoscan.",
+  "cancel": "Annulla",
+  "startOk": "Avvia",
+  "time": "Ora",
+  "position": "Posizione",
+  "useMyPos": "Usa la mia posizione attuale",
+  "note": "Annotazione",
+  "notePh": "Descrizione, riferimento, tipo di manufatto…",
+  "photos": "Foto",
+  "addPhoto": "📷 Aggiungi una foto",
+  "saveIndice": "Salva indizio",
+  "pdfReport": "Rapporto PDF",
+  "send": "Invia…",
+  "resend": "Invia di nuovo",
+  "download": "Scarica",
+  "close": "Chiudi",
+  "needHttps": "Questa pagina deve essere servita in HTTPS per usare Bluetooth e GPS.",
+  "noBluetooth": "Web Bluetooth non disponibile. Usa Chrome, Edge o Samsung Internet su Android (non Firefox, non iPhone).",
+  "unnamed": "(senza nome)",
+  "noKnown": "Nessun dispositivo per ora.",
+  "lastConn": "Ultima connessione: {d}",
+  "connCount": "{n} connessione/i",
+  "forget": "Dimentica",
+  "timeout": "{w}: tempo scaduto",
+  "logSelCancel": "Selezione annullata: {e}",
+  "logKnown": "Dispositivo autorizzato trovato, connessione diretta.",
+  "logDevice": "Dispositivo: {n} [{id}]",
+  "logConnected": "Connesso, notifiche attive.",
+  "logFail": "Errore: {e}",
+  "logLost": "Connessione persa.",
+  "logRetry": "Nuovo tentativo tra {s} s…",
+  "logNoDevInfo": "Servizio Device Information non leggibile.",
+  "logMsg": "Messaggio: {m}",
+  "logShortFrame": "Trama incompleta: {f}",
+  "logBadFrame": "Trama non valida: {f}",
+  "logFrame": "Trama: {f}  (conc {c}, max {m}, allarme {a}, intensità {i})",
+  "logSaveErr": "Salvataggio impossibile: {e}",
+  "logStarted": "Sorveglianza avviata: {n}",
+  "logAlarm": "Allarme n. {n}: {c}",
+  "logEnded": "Sorveglianza terminata.",
+  "logResumed": "Sorveglianza in corso ripresa.",
+  "logIndice": "Indizio n. {n} salvato.",
+  "logReportErr": "Errore rapporto: {e}",
+  "logSent": "Rapporto inviato: {n}",
+  "logShareErr": "Condivisione impossibile: {e}",
+  "logOsmNone": "Mappa di base OSM non disponibile per il PDF.",
+  "logOsm": "Mappa di base OSM: {e}",
+  "dev.Appareil": "Dispositivo",
+  "dev.Fabricant": "Produttore",
+  "dev.Modèle": "Modello",
+  "dev.Matériel": "Hardware",
+  "dev.Firmware": "Firmware",
+  "dev.Logiciel": "Software",
+  "thrNone": "Soglia di allarme —",
+  "thr": "Soglia {v}",
+  "exceeded": "SUPERATA",
+  "gpsNone": "GPS non disponibile in questo browser.",
+  "gpsSearching": "GPS: ricerca della posizione…",
+  "gpsPos": "GPS: {p} (± {a} m)",
+  "gpsDenied": "GPS negato: consenti la posizione per questo sito in Chrome.",
+  "gpsErr": "GPS: {e}",
+  "mapOff": "Mappa non disponibile: nessuna connessione internet al caricamento della pagina.",
+  "alarmN": "Allarme n. {n}",
+  "indiceN": "Indizio n. {n}",
+  "nShort": "n. {n}",
+  "startHintLive": "Registra il percorso GPS e i superamenti di allarme, poi genera un rapporto PDF.",
+  "startHintIdle": "Collega il Gazoscan per rilevare gli allarmi. Il percorso GPS viene registrato comunque.",
+  "missionDefault": "Missione del {d}",
+  "indiceAvail": "Indizio disponibile: {c}",
+  "indiceWait": "Indizio (in attesa di un superamento)",
+  "confirmStop": "Terminare la sorveglianza e generare il rapporto?",
+  "noPosYet": "Posizione GPS non ancora disponibile.",
+  "unavailable": "non disponibile",
+  "badPhoto": "Foto illeggibile: {e}",
+  "badFormat": "formato non supportato",
+  "noMissions": "Nessuna missione terminata.",
+  "counts": "{a} allarme/i · {i} indizio/i",
+  "sentShort": "✓ inviato",
+  "map": "Mappa",
+  "delete": "Elimina",
+  "confirmDel": "Eliminare definitivamente questa missione e le sue foto?",
+  "reportFile": "Rapporto_Gazoscan",
+  "generating": "Generazione del rapporto…",
+  "generatingMap": "Generazione del rapporto e della mappa di base…",
+  "reportErr": "Impossibile generare il rapporto: {e}",
+  "alreadySent": "✓ Già inviato il {d}",
+  "shareTitle": "Rapporto Gazoscan – {n}",
+  "shareText": "Rapporto di sorveglianza Gazoscan: {n} ({d})",
+  "confirmResend": "Questo rapporto è già stato inviato il {d}. Inviarlo di nuovo?",
+  "rTitle": "Rapporto di sorveglianza Gazoscan",
+  "maxConc": "Concentrazione max",
+  "rMission": "Missione",
+  "rStart": "Inizio",
+  "rEnd": "Fine",
+  "rMakerModel": "Produttore / modello",
+  "rFwSw": "Firmware / software",
+  "rDetection": "Rilevamento",
+  "detUser": "Concentrazione >= {v} (soglia inserita)",
+  "detDevice": "Concentrazione >= soglia di allarme del Gazoscan",
+  "rGpsPts": "Punti GPS",
+  "plan": "Mappa del percorso",
+  "noGps": "Nessuna posizione GPS registrata durante la missione.",
+  "osmAttr": "© contributori OpenStreetMap",
+  "north": "N",
+  "legTrack": "Percorso",
+  "legStart": "Partenza",
+  "legEnd": "Arrivo",
+  "legAlarm": "Allarme senza indizio",
+  "alarmsDetected": "Allarmi rilevati ({n})",
+  "noAlarms": "Nessun superamento di allarme durante la missione.",
+  "colN": "N.",
+  "colPos": "Posizione GPS",
+  "noPos": "posizione non disponibile",
+  "indicesTitle": "Indizi ({n})",
+  "noIndices": "Nessun indizio registrato.",
+  "dateTime": "Data e ora",
+  "at": "{d} alle {t}",
+  "alarm": "Allarme",
+  "openMap": "{p} (± {a} m) – apri mappa",
+  "generated": "Generato il {d} da Gazoscan Web v{v}",
+  "page": "Pagina {i} / {n}",
+  "chartLive": "● Dal vivo",
+  "chartAll": "Tutto",
+  "chartHint": "Tocca la curva (o il percorso sulla mappa) per vedere dove è stata presa una misura. Il cursore sotto la curva permette di tornare indietro.",
+  "cursorInfo": "{t} · {c} · {p}",
+  "posUnknown": "posizione sconosciuta",
+  "noSamples": "Nessuna misura registrata per questa missione.",
+  "chartMission": "Missione: {n}"
+ }
+};
+const LANG_NAMES = { fr: 'Français', en: 'English', de: 'Deutsch', es: 'Español', it: 'Italiano' };
+const DEFAULT_LOCALES = { fr: 'fr-FR', en: 'en-GB', de: 'de-DE', es: 'es-ES', it: 'it-IT' };
+const sysLangs = () => (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+const LANG = (() => {
+  const forced = store.get('gz_lang', '');
+  if (I18N[forced]) return forced;
+  for (const l of sysLangs()) { const c = String(l).slice(0, 2).toLowerCase(); if (I18N[c]) return c; }
+  return 'en';                                   // langue non prise en charge -> anglais
+})();
+const SEP = LANG === 'fr' ? ' : ' : ': ';   // « : » à la française, sinon « : » collé
+const LOCALE = sysLangs().find(l => String(l).slice(0, 2).toLowerCase() === LANG) || DEFAULT_LOCALES[LANG];
+function t(key, v = {}) {
+  const s = I18N[LANG][key] ?? I18N.en[key] ?? I18N.fr[key] ?? key;
+  return s.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? '');
+}
+function applyI18n() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(e => e.textContent = t(e.dataset.i18n));
+  document.querySelectorAll('[data-i18n-ph]').forEach(e => e.placeholder = t(e.dataset.i18nPh));
+  document.querySelectorAll('[data-i18n-title]').forEach(e => e.title = t(e.dataset.i18nTitle));
+  const sel = $('langSel'), forced = store.get('gz_lang', '');
+  sel.innerHTML = `<option value="">${t('langAuto')}</option>` +
+    Object.entries(LANG_NAMES).map(([c, n]) => `<option value="${c}">${n}</option>`).join('');
+  sel.value = I18N[forced] ? forced : '';
+  sel.onchange = () => { if (sel.value) store.set('gz_lang', sel.value); else store.del('gz_lang'); location.reload(); };
+}
+applyI18n();
+
+/* =====================================================================
    État BLE
    ===================================================================== */
 let device = null, measureChar = null, sendChar = null, devInfo = null;
 let userDisconnect = false, reconnectTimer = null, reconnectDelay = 1000;
 let rxBuffer = '', flushTimer = null, lastRawLog = 0;
-let lastFrame = 0, last = null, history = [];
+let lastFrame = 0, last = null;
 let demoTimer = null, wakeLock = null, bleState = 'idle';
 
 $('unit').textContent = UNIT;
 $('appVersion').textContent = 'v' + APP_VERSION;
-$('appVersion').title = 'Version du ' + APP_DATE;
-document.title = `Gazoscan v${APP_VERSION} – Surveillance`;
+$('appVersion').title = t('versionOf', { d: APP_DATE });
+document.title = t('docTitle', { v: APP_VERSION });
 document.querySelectorAll('.u').forEach(e => e.textContent = UNIT);
 for (let i = 0; i < 12; i++) $('bars').appendChild(document.createElement('i'));
 
-const STATES = { idle: 'Déconnecté', searching: 'Recherche…', connecting: 'Connexion…',
-  connected: 'Connecté', reconnecting: 'Reconnexion…', failed: 'Échec', demo: 'Démo' };
 const isBusy = () => bleState !== 'idle' && bleState !== 'failed';
 const isLive = () => bleState === 'connected' || bleState === 'demo';
 function setState(s) {
   bleState = s;
   const el = $('state');
   el.className = 'pill ' + (s === 'demo' ? 'connected' : s);
-  el.textContent = STATES[s] || s;
+  el.textContent = t('state.' + s);
   $('btnConnect').disabled = isBusy() || !navigator.bluetooth;
   $('btnDisconnect').disabled = !isBusy();
-  $('btnDemo').textContent = s === 'demo' ? 'Arrêter la démo' : 'Mode démo';
+  $('btnDemo').textContent = t(s === 'demo' ? 'stopDemo' : 'demo');
   $('btnDemo').disabled = isBusy() && s !== 'demo';
   document.querySelectorAll('[data-dev]').forEach(b => b.disabled = isBusy() || !navigator.bluetooth);
   renderMission();
@@ -360,8 +1303,8 @@ function setState(s) {
 
 (function checkSupport() {
   let msg = '';
-  if (!window.isSecureContext) msg = 'Cette page doit être servie en HTTPS pour utiliser le Bluetooth et le GPS.';
-  else if (!navigator.bluetooth) msg = 'Web Bluetooth non disponible. Utilisez Chrome, Edge ou Samsung Internet sur Android (pas Firefox, pas iPhone).';
+  if (!window.isSecureContext) msg = t('needHttps');
+  else if (!navigator.bluetooth) msg = t('noBluetooth');
   if (msg) { $('support').textContent = msg; $('support').style.display = 'block'; }
 })();
 
@@ -372,7 +1315,7 @@ function rememberDevice(extra) {
   if (!device) return;
   const list = store.get('gz_devices', {});
   const e = list[device.id] || { id: device.id, count: 0 };
-  e.name = device.name || e.name || '(sans nom)';
+  e.name = device.name || e.name || t('unnamed');
   if (extra) Object.assign(e, extra);
   else { e.last = Date.now(); e.count = (e.count || 0) + 1; }
   list[device.id] = e;
@@ -382,15 +1325,15 @@ function rememberDevice(extra) {
 function renderDevices() {
   const list = Object.values(store.get('gz_devices', {})).sort((a, b) => b.last - a.last);
   const el = $('devList');
-  if (!list.length) { el.innerHTML = '<div class="empty">Aucun appareil pour l’instant.</div>'; return; }
+  if (!list.length) { el.innerHTML = `<div class="empty">${t('noKnown')}</div>`; return; }
   el.innerHTML = list.map(d => `
     <div class="item">
       <div class="grow">
         <div class="t">${esc(d.name)}</div>
-        <div class="s">Dernière connexion : ${fmtDate(d.last)}${d.count ? ` · ${d.count} connexion${d.count > 1 ? 's' : ''}` : ''}${d.fw ? ` · FW ${esc(d.fw)}` : ''}</div>
+        <div class="s">${t('lastConn', { d: fmtDate(d.last) })}${d.count ? ` · ${t('connCount', { n: d.count })}` : ''}${d.fw ? ` · FW ${esc(d.fw)}` : ''}</div>
       </div>
-      <button class="small" data-dev="${esc(d.id)}">Connecter</button>
-      <button class="x" data-forget="${esc(d.id)}" title="Oublier">×</button>
+      <button class="small" data-dev="${esc(d.id)}">${t('connect')}</button>
+      <button class="x" data-forget="${esc(d.id)}" title="${t('forget')}">×</button>
     </div>`).join('');
   el.querySelectorAll('[data-dev]').forEach(b => {
     b.disabled = isBusy() || !navigator.bluetooth;
@@ -411,7 +1354,7 @@ async function requestDevice(filters) {
   try {
     useDevice(await navigator.bluetooth.requestDevice({ filters, optionalServices }));
   } catch (e) {
-    log('Sélection annulée : ' + e.message);
+    log(t('logSelCancel', { e: e.message }));
     setState('idle');
   }
 }
@@ -422,7 +1365,7 @@ async function connectKnown(entry) {
   if (navigator.bluetooth.getDevices) {
     try {
       const d = (await navigator.bluetooth.getDevices()).find(x => x.id === entry.id);
-      if (d) { log('Appareil autorisé retrouvé, connexion directe.'); useDevice(d); return; }
+      if (d) { log(t('logKnown')); useDevice(d); return; }
     } catch {}
   }
   // Sinon : sélecteur limité à cet appareil
@@ -431,7 +1374,7 @@ async function connectKnown(entry) {
 
 function useDevice(d) {
   device = d;
-  log(`Appareil : ${device.name || '(sans nom)'} [${device.id}]`);
+  log(t('logDevice', { n: device.name || t('unnamed'), id: device.id }));
   device.removeEventListener('gattserverdisconnected', onDisconnected);
   device.addEventListener('gattserverdisconnected', onDisconnected);
   userDisconnect = false;
@@ -441,7 +1384,7 @@ function useDevice(d) {
 }
 
 const withTimeout = (p, ms, what) =>
-  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ' : délai dépassé')), ms))]);
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(t('timeout', { w: what }))), ms))]);
 
 async function connect() {
   if (!device) return;
@@ -449,14 +1392,14 @@ async function connect() {
   const first = !measureChar;
   setState(first ? 'connecting' : 'reconnecting');
   try {
-    const server = await withTimeout(device.gatt.connect(), 15000, 'Connexion');
+    const server = await withTimeout(device.gatt.connect(), 15000, 'GATT');
     const service = await withTimeout(server.getPrimaryService(SERVICE_UUID), 8000, 'Service');
     measureChar = await service.getCharacteristic(MEASURE_UUID);
     measureChar.removeEventListener('characteristicvaluechanged', onMeasure);
     measureChar.addEventListener('characteristicvaluechanged', onMeasure);
     await measureChar.startNotifications();
     try { sendChar = await service.getCharacteristic(SENDING_UUID); } catch { sendChar = null; }
-    log('Connecté, notifications actives.');
+    log(t('logConnected'));
     rxBuffer = '';
     reconnectDelay = 1000;
     setState('connected');
@@ -464,21 +1407,21 @@ async function connect() {
     keepAwake();
     readDeviceInfo(server);
   } catch (e) {
-    log('Échec : ' + e.message);
+    log(t('logFail', { e: e.message }));
     try { device.gatt.disconnect(); } catch {}
     if (!userDisconnect) scheduleReconnect(); else setState('failed');
   }
 }
 
 function onDisconnected() {
-  log('Liaison perdue.');
+  log(t('logLost'));
   if (userDisconnect) { setState('idle'); return; }
   scheduleReconnect();
 }
 function scheduleReconnect() {
   setState('reconnecting');
   clearTimeout(reconnectTimer);
-  log(`Nouvelle tentative dans ${reconnectDelay / 1000} s…`);
+  log(t('logRetry', { s: reconnectDelay / 1000 }));
   reconnectTimer = setTimeout(connect, reconnectDelay);
   reconnectDelay = Math.min(reconnectDelay * 2, 15000);
 }
@@ -494,7 +1437,7 @@ async function disconnect() {
 }
 
 async function readDeviceInfo(server) {
-  const info = { Appareil: device.name || '(sans nom)' };
+  const info = { Appareil: device.name || t('unnamed') };
   try {
     const s = await server.getPrimaryService('device_information');
     const map = { manufacturer_name_string: 'Fabricant', model_number_string: 'Modèle',
@@ -505,13 +1448,13 @@ async function readDeviceInfo(server) {
         info[label] = new TextDecoder().decode(v).replace(/\0/g, '').trim();
       } catch {}
     }
-  } catch { log('Service Device Information non lisible.'); }
+  } catch { log(t('logNoDevInfo')); }
   showInfo(info);
   if (info.Firmware) rememberDevice({ fw: info.Firmware });
 }
 function showInfo(info) {
   devInfo = info;
-  $('devinfo').innerHTML = Object.entries(info).map(([k, v]) => `${esc(k)} : <b>${esc(v)}</b>`).join('<br>');
+  $('devinfo').innerHTML = Object.entries(info).map(([k, v]) => `${esc(t('dev.' + k))}${SEP}<b>${esc(v)}</b>`).join('<br>');
   if (mission) { mission.device = info; scheduleSave(); }
 }
 
@@ -526,7 +1469,7 @@ function onMeasure(ev) {
 function feed(txt) {
   txt = txt.replace(/\0/g, '');
   if (!txt) return;
-  if (!rxBuffer && txt[0] !== '$') { log('Message : ' + txt.trim()); return; }
+  if (!rxBuffer && txt[0] !== '$') { log(t('logMsg', { m: txt.trim() })); return; }
   rxBuffer += txt;
   clearTimeout(flushTimer);
   const parts = rxBuffer.split('$');
@@ -551,13 +1494,13 @@ function intensityLevel(i) {
 }
 function parseFrame(seg) {
   seg = seg.replace(/[\r\n]/g, '');
-  if (seg.length < 10) { log('Trame incomplète : $' + seg); return; }
+  if (seg.length < 10) { log(t('logShortFrame', { f: '$' + seg })); return; }
   const f = { conc: field(seg, 0), max: field(seg, 6), alarm: field(seg, 12), intens: field(seg, 18), t: Date.now() };
-  if (f.conc === null) { log('Trame invalide : $' + seg); return; }
-  if (f.t - lastRawLog > 5000) { lastRawLog = f.t; log(`Trame : $${seg}  (conc ${f.conc}, max ${f.max}, alarme ${f.alarm}, intensité ${f.intens})`); }
+  if (f.conc === null) { log(t('logBadFrame', { f: '$' + seg })); return; }
+  if (f.t - lastRawLog > 5000) { lastRawLog = f.t; log(t('logFrame', { f: '$' + seg, c: f.conc, m: f.max, a: f.alarm, i: f.intens })); }
   last = f;
   lastFrame = f.t;
-  history.push({ t: f.t, v: f.conc });
+  recordSample(f);
   render();
   missionOnFrame(f);
 }
@@ -587,7 +1530,7 @@ function render() {
   $('max').innerHTML = `${fmt(last.max)} <small>${UNIT}</small>`;
   const a = $('alarm');
   const thr = alarmThreshold(last);
-  a.textContent = thr === null ? 'Seuil d’alarme —' : `Seuil ${fmt(thr)}${alarm ? ' : DÉPASSÉ' : ''}`;
+  a.textContent = thr === null ? t('thrNone') : t('thr', { v: fmt(thr) }) + (alarm ? SEP + t('exceeded') : '');
   a.className = 'alarmbadge' + (alarm ? ' on' : '');
   if (last.intens !== null) {
     const { lvl, color } = intensityLevel(last.intens);
@@ -601,7 +1544,7 @@ function tick() {
   const pressed = live && last && Date.now() - lastFrame <= TRIGGER_TIMEOUT_MS;
   const tr = $('trigger');
   tr.className = 'trigger' + (pressed ? ' on' : '');
-  tr.innerHTML = 'Gâchette : <b>' + (!live ? '—' : pressed ? 'appuyée' : 'relâchée') + '</b>';
+  tr.innerHTML = esc(t('trigger')) + SEP + '<b>' + (!live ? '—' : t(pressed ? 'pressed' : 'released')) + '</b>';
   if (last) {
     $('conc').classList.toggle('idle', !pressed);
     $('mainCard').classList.toggle('alarm', !!(pressed && isAlarmFrame(last)));
@@ -611,34 +1554,152 @@ function tick() {
 }
 setInterval(tick, 250);
 
+/* =====================================================================
+   Historique des mesures : revue dans le temps + lien avec la carte
+   Chaque mesure garde la position GPS du moment où elle a été reçue.
+   ===================================================================== */
+const liveSamples = [];                 // mesures de la session { t, v, lat, lon, acc }
+const LIVE_MAX = 80000;                 // ≈ 4 h à 5 trames/s
+const GAP_MS = 3000;                    // trou dans la courbe si pas de mesure pendant 3 s (gâchette relâchée)
+const chart = { live: true, end: 0, span: 60000, sel: null, viewStart: 0, viewEnd: 0, minEnd: 0, maxEnd: 0 };
+
+function recordSample(f) {
+  const smp = { t: f.t, v: f.conc };
+  if (lastPos && f.t - lastPos.t < 15000) { smp.lat = lastPos.lat; smp.lon = lastPos.lon; smp.acc = lastPos.acc; }
+  liveSamples.push(smp);
+  if (liveSamples.length > LIVE_MAX) liveSamples.splice(0, liveSamples.length - LIVE_MAX);
+  if (mission) {                         // mission : 1 point par seconde (le plus fort) pour limiter la taille
+    const ms = mission.samples || (mission.samples = []), l = ms[ms.length - 1];
+    if (l && Math.floor(l.t / 1000) === Math.floor(smp.t / 1000)) { if (smp.v > l.v) Object.assign(l, smp); }
+    else ms.push({ ...smp });
+    scheduleSave();
+  }
+}
+const chartData = () => shownMission ? (shownMission.samples || []) : liveSamples;
+function lowerBound(a, tt) { let lo = 0, hi = a.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (a[mid].t < tt) lo = mid + 1; else hi = mid; } return lo; }
+function nearestSample(a, tt) {
+  if (!a.length) return null;
+  const i = lowerBound(a, tt);
+  if (i <= 0) return a[0];
+  if (i >= a.length) return a[a.length - 1];
+  return tt - a[i - 1].t <= a[i].t - tt ? a[i - 1] : a[i];
+}
+const fmtHM = tt => new Date(tt).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
 function drawChart() {
   const cv = $('chart'), dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
-  if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+  if (!w) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
-  const now = Date.now();
-  history = history.filter(p => now - p.t <= HISTORY_MS);
-  const maxV = Math.max(10, ...history.map(p => p.v)) * 1.1;
+  const data = chartData(), now = Date.now();
+  const first = data.length ? data[0].t : now, lastT = data.length ? data[data.length - 1].t : now;
+  const span = chart.span || Math.max(10000, (lastT - first) * 1.02);   // « Tout » : toute la période
+  const maxEnd = shownMission ? lastT : Math.max(now, lastT);
+  const minEnd = Math.min(first + span, maxEnd);
+  let end = chart.live && !shownMission ? maxEnd : (chart.end || maxEnd);
+  end = Math.max(minEnd, Math.min(maxEnd, end));
+  const start = end - span;
+  Object.assign(chart, { viewStart: start, viewEnd: end, minEnd, maxEnd });
+  if (!chart.live || shownMission) chart.end = end;
+
+  const PH = h - 16;                                       // hauteur du tracé (16 px pour les heures)
+  const a = Math.max(0, lowerBound(data, start) - 1), b = Math.min(data.length, lowerBound(data, end) + 1);
+  let vmax = 10;
+  for (let i = a; i < b; i++) if (data[i].v > vmax) vmax = data[i].v;
+  const thrRef = shownMission ? (shownMission.threshold || shownMission.deviceAlarm) : alarmThreshold(last);
+  const maxV = Math.max(vmax, thrRef && thrRef < vmax * 3 ? thrRef : 0) * 1.12;
+  const X = tt => (tt - start) / span * w, Y = v => PH - 2 - v / maxV * (PH - 16);
+
   g.strokeStyle = '#334155'; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(0, h - 0.5); g.lineTo(w, h - 0.5); g.stroke();
-  const thr = mission && mission.threshold;
-  if (thr > 0 && thr < maxV) {
-    const y = h - 2 - thr / maxV * (h - 18);
-    g.strokeStyle = 'rgba(239,68,68,.6)'; g.setLineDash([4, 4]);
-    g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); g.setLineDash([]);
+  g.beginPath(); g.moveTo(0, PH + 0.5); g.lineTo(w, PH + 0.5); g.stroke();
+  if (thrRef > 0 && thrRef < maxV) {
+    g.strokeStyle = 'rgba(239,68,68,.65)'; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(0, Y(thrRef)); g.lineTo(w, Y(thrRef)); g.stroke(); g.setLineDash([]);
   }
   g.fillStyle = '#94a3b8'; g.font = '11px system-ui';
-  g.fillText(fmt(Math.round(maxV)), 4, 12);
-  if (!history.length) return;
-  g.strokeStyle = '#38bdf8'; g.lineWidth = 2; g.beginPath();
-  let prev = null;
-  for (const p of history) {
-    const x = w - (now - p.t) / HISTORY_MS * w, y = h - 2 - p.v / maxV * (h - 18);
-    if (!prev || p.t - prev.t > 1500) g.moveTo(x, y); else g.lineTo(x, y);
-    prev = p;
+  g.textAlign = 'left'; g.fillText(fmt(Math.round(maxV)), 4, 12);
+  g.font = '10px system-ui';
+  g.fillText(fmtHM(start), 2, h - 3);
+  g.textAlign = 'right'; g.fillText(fmtHM(end), w - 2, h - 3);
+  g.textAlign = 'left';
+
+  if (b > a) {
+    // une valeur max par pixel : courbe fluide même sur plusieurs heures
+    g.strokeStyle = '#38bdf8'; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+    let px = null, pv = 0, pt = 0, prevT = null, open = false;
+    const flush = () => { if (px === null) return; const y = Y(pv); if (open) g.lineTo(px, y); else { g.moveTo(px, y); open = true; } };
+    for (let i = a; i < b; i++) {
+      const p = data[i], x = Math.round(X(p.t));
+      if (prevT !== null && p.t - prevT > GAP_MS) { flush(); px = null; open = false; }
+      if (x !== px) { flush(); px = x; pv = p.v; } else if (p.v > pv) pv = p.v;
+      prevT = p.t;
+    }
+    flush();
+    g.stroke();
   }
-  g.stroke();
+
+  // curseur de revue
+  const sel = chart.sel;
+  if (sel && sel.t >= start && sel.t <= end) {
+    const x = X(sel.t), y = Y(sel.v);
+    g.strokeStyle = '#facc15'; g.lineWidth = 1; g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, PH); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#facc15'; g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#0f172a'; g.lineWidth = 2; g.stroke();
+    const lbl = `${fmt(sel.v)} · ${fmtHM(sel.t)}`;
+    g.font = '600 12px system-ui';
+    const tw = g.measureText(lbl).width + 12, bx = Math.min(Math.max(x - tw / 2, 0), w - tw), by = 16;
+    g.fillStyle = 'rgba(15,23,42,.92)'; g.fillRect(bx, by, tw, 20);
+    g.fillStyle = '#facc15'; g.fillText(lbl, bx + 6, by + 14);
+  }
+
+  // commandes
+  const sl = $('chartSlider');
+  if (document.activeElement !== sl) sl.value = maxEnd > minEnd ? Math.round((end - minEnd) / (maxEnd - minEnd) * 1000) : 1000;
+  sl.disabled = !(maxEnd > minEnd);
+  $('btnLive').classList.toggle('on', chart.live && !shownMission);
+  document.querySelectorAll('.zooms button').forEach(bt => bt.classList.toggle('on', +bt.dataset.span === chart.span));
+}
+
+// Sélection d'une mesure : courbe -> carte
+function selectSample(smp, center) {
+  chart.sel = smp;
+  const info = $('chartInfo');
+  if (!smp) { info.textContent = t('chartHint'); mapClearCursor(); return; }
+  const pos = smp.lat !== undefined ? `${smp.lat.toFixed(6)}, ${smp.lon.toFixed(6)} (± ${smp.acc} m)` : t('posUnknown');
+  info.innerHTML = t('cursorInfo', { t: `<b>${fmtHM(smp.t)}</b>`, c: `<b>${fmt(smp.v)} ${esc(UNIT)}</b>`, p: esc(pos) });
+  mapShowCursor(smp, center);
+}
+function chartPick(ev) {
+  const r = $('chart').getBoundingClientRect();
+  const x = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+  if (chart.live) { chart.live = false; chart.end = chart.viewEnd; }
+  selectSample(nearestSample(chartData(), chart.viewStart + x / r.width * (chart.viewEnd - chart.viewStart)), true);
+}
+(() => {
+  const cv = $('chart');
+  let down = false;
+  cv.addEventListener('pointerdown', e => { down = true; try { cv.setPointerCapture(e.pointerId); } catch {} chartPick(e); });
+  cv.addEventListener('pointermove', e => { if (down) chartPick(e); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(n => cv.addEventListener(n, () => down = false));
+  $('chartSlider').addEventListener('input', e => {
+    chart.live = false;
+    chart.end = chart.minEnd + e.target.value / 1000 * (chart.maxEnd - chart.minEnd);
+  });
+  document.querySelectorAll('.zooms button').forEach(bt => bt.onclick = () => {
+    const keepT = chart.sel ? chart.sel.t : null;
+    chart.span = +bt.dataset.span;
+    if (keepT && !chart.live) chart.end = keepT + (chart.span || 0) / 2;   // garde la mesure choisie à l'écran
+  });
+  $('btnLive').onclick = () => goLive();
+})();
+function goLive() {
+  chart.live = true; chart.end = 0;
+  if (!chart.span) chart.span = 60000;
+  selectSample(null);
+  if (shownMission) $('btnMapClose').onclick();
 }
 
 /* =====================================================================
@@ -672,9 +1733,9 @@ function alertUser() {
 let mission = null, geoWatch = null, lastPos = null, saveTimer = null;
 
 function scheduleSave(now) {
-  clearTimeout(saveTimer);
-  const doSave = () => mission && db.put(mission).catch(e => log('Sauvegarde impossible : ' + e.message));
-  if (now) doSave(); else saveTimer = setTimeout(doSave, 2000);
+  const doSave = () => mission && db.put(mission).catch(e => log(t('logSaveErr', { e: e.message })));
+  if (now) { clearTimeout(saveTimer); saveTimer = null; doSave(); }
+  else if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; doSave(); }, 2000);  // au plus une sauvegarde / 2 s
 }
 
 $('btnStart').onclick = () => {
@@ -689,7 +1750,7 @@ $('btnStartOk').onclick = () => {
   store.set('gz_operator', $('fOp').value.trim());
   store.set('gz_threshold', $('fThr').value.trim());
   closeModal('dlgStart');
-  startMission($('fName').value.trim() || `Mission du ${fmtDate(Date.now())}`, $('fOp').value.trim(), thr > 0 ? thr : null);
+  startMission($('fName').value.trim() || t('missionDefault', { d: fmtDate(Date.now()) }), $('fOp').value.trim(), thr > 0 ? thr : null);
 };
 
 function startMission(name, operator, threshold) {
@@ -699,7 +1760,7 @@ function startMission(name, operator, threshold) {
   store.set('gz_active', mission.id);
   shownMission = null;
   follow = true;
-  log('Surveillance démarrée : ' + name);
+  log(t('logStarted', { n: name }));
   startGeo();
   keepAwake();
   renderMission();
@@ -708,11 +1769,11 @@ function startMission(name, operator, threshold) {
 
 function startGeo() {
   if (geoWatch !== null) return;                 // déjà actif (carte ou mission)
-  if (!navigator.geolocation) { gpsHint('GPS indisponible sur ce navigateur.', true); return; }
-  gpsHint('GPS : recherche de la position…');
+  if (!navigator.geolocation) { gpsHint(t('gpsNone'), true); return; }
+  gpsHint(t('gpsSearching'));
   geoWatch = navigator.geolocation.watchPosition(p => {
     lastPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy), t: Date.now() };
-    gpsHint(`GPS : ${fmtPos(lastPos)} (± ${lastPos.acc} m)`);
+    gpsHint(t('gpsPos', { p: fmtPos(lastPos), a: lastPos.acc }));
     mapUpdateMe();
     if (!mission) return;
     const tr = mission.track, prev = tr[tr.length - 1];
@@ -722,7 +1783,7 @@ function startGeo() {
       scheduleSave();
     }
   }, e => {
-    gpsHint(e.code === 1 ? 'GPS refusé : autorisez la localisation pour ce site dans Chrome.' : 'GPS : ' + e.message, true);
+    gpsHint(e.code === 1 ? t('gpsDenied') : t('gpsErr', { e: e.message }), true);
     if (e.code === 1) { navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
   }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
   if (map) renderMapButtons();
@@ -735,19 +1796,36 @@ function gpsHint(t, bad) {
    Carte OpenStreetMap (Leaflet)
    ===================================================================== */
 let map = null, meMarker = null, meAcc = null, trackLine = null, layerAlarms = null, layerIndices = null;
-let follow = true, shownMission = null, mapKey = '';
+let follow = true, shownMission = null, mapKey = '', cursorMarker = null;
 
 function initMap() {
   if (!window.L) {
-    $('map').innerHTML = '<div class="mapoff">Carte indisponible : pas de connexion internet au chargement de la page.</div>';
+    $('map').innerHTML = `<div class="mapoff">${t('mapOff')}</div>`;
     $('btnLocate').disabled = true;
+    $('btnLocate').textContent = t('locate');
     return;
   }
   map = L.map('map', { zoomControl: true }).setView([46.6, 2.4], 5);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
-  trackLine = L.polyline([], { color: '#0284c7', weight: 4, opacity: .9 }).addTo(map);
+  trackLine = L.polyline([], { color: '#0284c7', weight: 5, opacity: .9 }).addTo(map);
+  // Carte -> courbe : toucher près du trajet (30 px, adapté au doigt) sélectionne la mesure la plus proche
+  map.on('click', e => {
+    const data = chartData();
+    if (!data.length) return;
+    const cp = map.latLngToContainerPoint(e.latlng);
+    let best = null, bd = Infinity;
+    for (const p of data) {
+      if (p.lat === undefined) continue;
+      const q = map.latLngToContainerPoint([p.lat, p.lon]), dd = (q.x - cp.x) ** 2 + (q.y - cp.y) ** 2;
+      if (dd < bd || (dd === bd && best && p.t > best.t)) { bd = dd; best = p; }
+    }
+    if (!best || bd > 30 * 30) return;
+    if (chart.live) chart.live = false;
+    if (best.t < chart.viewStart || best.t > chart.viewEnd || !chart.end) chart.end = best.t + (chart.span || 0) / 2;
+    selectSample(best, false);
+  });
   layerAlarms = L.layerGroup().addTo(map);
   layerIndices = L.layerGroup().addTo(map);
   map.on('dragstart', () => { follow = false; renderMapButtons(); });
@@ -782,16 +1860,34 @@ function mapRenderMission(force) {
   const u = m.unit || UNIT;
   m.alarms.filter(a => a.pos && !a.indice).forEach(a =>
     L.circleMarker([a.pos.lat, a.pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#ea580c', fillOpacity: 1 })
-      .bindPopup(`<b>Alarme n°${a.n}</b><br>${fmtTime(a.t)}<br><b style="color:#dc2626">${fmt(a.conc)} ${u}</b>`)
+      .bindPopup(`<b>${t('alarmN', { n: a.n })}</b><br>${fmtTime(a.t)}<br><b style="color:#dc2626">${fmt(a.conc)} ${u}</b>`)
       .addTo(layerAlarms));
   m.indices.filter(i => i.pos).forEach(i =>
     L.marker([i.pos.lat, i.pos.lon], { icon: L.divIcon({ className: 'pin', html: String(i.n), iconSize: [28, 28], iconAnchor: [14, 14] }) })
-      .bindPopup(`<b>Indice n°${i.n}</b> · ${fmtTime(i.t)}<br><b style="color:#dc2626">${fmt(i.conc)} ${u}</b>` +
+      .bindPopup(`<b>${t('indiceN', { n: i.n })}</b> · ${fmtTime(i.t)}<br><b style="color:#dc2626">${fmt(i.conc)} ${u}</b>` +
         (i.note ? `<br>${esc(i.note)}` : '') +
         (i.photos.length ? `<br><img src="${i.photos[0].data}" style="width:170px;border-radius:6px;margin-top:6px">` : ''),
         { maxWidth: 200 })
       .addTo(layerIndices));
 }
+
+function mapShowCursor(smp, center) {
+  if (!map) return;
+  if (smp.lat === undefined) { mapClearCursor(); return; }
+  const ll = [smp.lat, smp.lon], tip = `${fmt(smp.v)} ${UNIT}<br>${fmtHM(smp.t)}`;
+  if (!cursorMarker) {
+    cursorMarker = L.circleMarker(ll, { radius: 10, color: '#0f172a', weight: 3, fillColor: '#facc15', fillOpacity: 1 })
+      .bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'curtip' }).addTo(map);
+  } else { cursorMarker.setLatLng(ll).setTooltipContent(tip); }
+  cursorMarker.bringToFront();
+  follow = false;                       // on regarde le passé : la carte ne suit plus la position
+  renderMapButtons();
+  if (center) {
+    if (!map.getBounds().pad(-0.15).contains(ll)) map.setView(ll, Math.max(map.getZoom(), 17));
+    renderMapButtons();
+  }
+}
+function mapClearCursor() { if (cursorMarker) { cursorMarker.remove(); cursorMarker = null; } }
 
 function fitMission(m) {
   const pts = [...m.track, ...m.alarms.filter(a => a.pos).map(a => a.pos), ...m.indices.filter(i => i.pos).map(i => i.pos)];
@@ -804,6 +1900,8 @@ async function showMissionOnMap(id) {
   if (!m) return;
   shownMission = m;
   follow = false;
+  chart.live = false; chart.span = 0; chart.end = 0; selectSample(null);
+  if (!(m.samples || []).length) $('chartInfo').textContent = t('noSamples');
   mapRenderMission(true);
   fitMission(m);
   renderMapButtons();
@@ -812,15 +1910,17 @@ async function showMissionOnMap(id) {
 
 function renderMapButtons() {
   const b = $('btnLocate');
-  b.textContent = geoWatch === null ? '📍 Me localiser' : follow ? '📍 Suivi actif' : '📍 Recentrer sur moi';
+  b.textContent = t(geoWatch === null ? 'locate' : follow ? 'following' : 'recenter');
   b.classList.toggle('on', geoWatch !== null && follow && !shownMission);
   $('mapShown').hidden = !shownMission;
   if (shownMission) $('mapShownName').textContent = shownMission.name;
+  $('chartTitle').textContent = shownMission ? t('chartMission', { n: shownMission.name }) : t('history');
 }
 
 $('btnLocate').onclick = () => {
   shownMission = null;
   follow = true;
+  if (!chart.live || chart.sel) { chart.live = true; chart.end = 0; if (!chart.span) chart.span = 60000; selectSample(null); }
   startGeo();
   mapRenderMission(true);
   if (lastPos) map.setView([lastPos.lat, lastPos.lon], Math.max(map.getZoom(), 17));
@@ -829,6 +1929,7 @@ $('btnLocate').onclick = () => {
 $('btnMapClose').onclick = () => {
   shownMission = null;
   follow = true;
+  chart.live = true; chart.end = 0; if (!chart.span) chart.span = 60000; selectSample(null);
   mapRenderMission(true);
   if (lastPos) map.setView([lastPos.lat, lastPos.lon], 17);
   renderMapButtons();
@@ -846,7 +1947,7 @@ function missionOnFrame(f) {
   if (!a || f.t - a.lastT > ALARM_GAP_MS || rearm) {
     mission.alarms.push({ n: mission.alarms.length + 1, t: f.t, lastT: f.t, conc: f.conc,
       pos: lastPos ? { ...lastPos } : null, indice: null });
-    log(`Alarme n°${mission.alarms.length} : ${f.conc} ${UNIT}`);
+    log(t('logAlarm', { n: mission.alarms.length, c: `${f.conc} ${UNIT}` }));
     alertUser();
     scheduleSave(true);
   } else {
@@ -867,8 +1968,8 @@ function renderMission() {
   $('missionIdle').hidden = on;
   $('missionActive').hidden = !on;
   $('startHint').textContent = isLive()
-    ? 'Enregistre le trajet GPS et les dépassements d’alarme, puis génère un rapport PDF.'
-    : 'Connecte le Gazoscan pour détecter les alarmes. Le trajet GPS est enregistré dans tous les cas.';
+    ? t('startHintLive')
+    : t('startHintIdle');
   mapRenderMission();
   if (!on) return;
   $('mName').textContent = mission.name;
@@ -878,22 +1979,22 @@ function renderMission() {
   const a = pendingAlarm(), b = $('btnIndice');
   b.disabled = !a;
   b.classList.toggle('pulse', !!a);
-  b.textContent = a ? `Indice disponible : ${fmt(a.conc)} ${UNIT}` : 'Indice (en attente d’un dépassement)';
+  b.textContent = a ? t('indiceAvail', { c: `${fmt(a.conc)} ${UNIT}` }) : t('indiceWait');
 }
 
 $('btnStop').onclick = async () => {
-  if (!confirm('Terminer la surveillance et générer le rapport ?')) return;
+  if (!confirm(t('confirmStop'))) return;
   mission.end = Date.now();
   clearTimeout(saveTimer);
   await db.put(mission);
   store.del('gz_active');
   const m = mission;
   mission = null;
-  log('Surveillance terminée.');
+  log(t('logEnded'));
   if (!isLive()) releaseWake();
   renderMission();
   renderMissions();
-  if (map) { shownMission = m; follow = false; mapRenderMission(true); fitMission(m); renderMapButtons(); }
+  if (map) { shownMission = m; follow = false; chart.live = false; chart.span = 0; chart.end = 0; selectSample(null); mapRenderMission(true); fitMission(m); renderMapButtons(); }
   showReport(m);
 };
 
@@ -902,7 +2003,7 @@ async function resumeMission() {
   if (!id) return;
   try {
     const m = await db.get(id);
-    if (m && !m.end) { mission = m; log('Surveillance en cours reprise.'); startGeo(); keepAwake(); renderMission(); }
+    if (m && !m.end) { mission = m; liveSamples.push(...(m.samples || [])); log(t('logResumed')); startGeo(); keepAwake(); renderMission(); }
     else store.del('gz_active');
   } catch {}
 }
@@ -916,7 +2017,7 @@ $('btnIndice').onclick = () => {
   const a = pendingAlarm();
   if (!a) return;
   indiceDraft = { alarm: a, pos: a.pos || (lastPos ? { ...lastPos } : null), photos: [] };
-  $('iTitle').textContent = `Indice n°${mission.indices.length + 1}`;
+  $('iTitle').textContent = t('indiceN', { n: mission.indices.length + 1 });
   $('iTime').textContent = fmtTime(a.t);
   $('iConc').textContent = `${fmt(a.conc)} ${UNIT}`;
   $('iNote').value = '';
@@ -924,13 +2025,13 @@ $('btnIndice').onclick = () => {
   openModal('dlgIndice');
 };
 $('btnPosNow').onclick = () => {
-  if (!lastPos) { alert('Position GPS pas encore disponible.'); return; }
+  if (!lastPos) { alert(t('noPosYet')); return; }
   indiceDraft.pos = { ...lastPos };
   renderDraft();
 };
 function renderDraft() {
   const p = indiceDraft.pos;
-  $('iPos').innerHTML = p ? `${fmtPos(p)}<br><span style="color:var(--mute);font-weight:400">± ${p.acc} m</span>` : 'indisponible';
+  $('iPos').innerHTML = p ? `${fmtPos(p)}<br><span style="color:var(--mute);font-weight:400">± ${p.acc} m</span>` : t('unavailable');
   $('iThumbs').innerHTML = indiceDraft.photos.map((ph, i) =>
     `<div><img src="${ph.data}" alt=""><button data-rm="${i}">×</button></div>`).join('');
   $('iThumbs').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { indiceDraft.photos.splice(+b.dataset.rm, 1); renderDraft(); });
@@ -940,12 +2041,12 @@ $('iPhoto').onchange = async e => {
   e.target.value = '';
   if (!file) return;
   try { indiceDraft.photos.push(await fileToJpeg(file)); renderDraft(); }
-  catch (err) { alert('Photo illisible : ' + err.message); }
+  catch (err) { alert(t('badPhoto', { e: err.message })); }
 };
 async function fileToJpeg(file, max = 1280) {
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('format non pris en charge')); i.src = url; });
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(t('badFormat'))); i.src = url; });
     const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
     const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
@@ -962,7 +2063,7 @@ $('btnIndiceOk').onclick = () => {
   a.indiceT = Date.now();
   indiceDraft = null;
   closeModal('dlgIndice');
-  log(`Indice n°${ind.n} enregistré.`);
+  log(t('logIndice', { n: ind.n }));
   renderMission();
   scheduleSave(true);
 };
@@ -974,21 +2075,21 @@ async function renderMissions() {
   let list = [];
   try { list = (await db.all()).filter(m => m.end).sort((a, b) => b.start - a.start); } catch {}
   const el = $('missionList');
-  if (!list.length) { el.innerHTML = '<div class="empty">Aucune mission terminée.</div>'; return; }
+  if (!list.length) { el.innerHTML = `<div class="empty">${t('noMissions')}</div>`; return; }
   el.innerHTML = list.map(m => `
     <div class="item">
       <div class="grow">
         <div class="t">${esc(m.name)}</div>
-        <div class="s">${fmtDate(m.start)} · ${fmtDur(m.end - m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)${m.sentAt ? ' · <span style="color:var(--ok)">✓ envoyé</span>' : ''}</div>
+        <div class="s">${fmtDate(m.start)} · ${fmtDur(m.end - m.start)} · ${t('counts', { a: m.alarms.length, i: m.indices.length })}${m.sentAt ? ` · <span style="color:var(--ok)">${t('sentShort')}</span>` : ''}</div>
       </div>
-      <button class="small sec" data-map="${m.id}">Carte</button>
+      <button class="small sec" data-map="${m.id}">${t('map')}</button>
       <button class="small" data-pdf="${m.id}">PDF</button>
-      <button class="x" data-delm="${m.id}" title="Supprimer">×</button>
+      <button class="x" data-delm="${m.id}" title="${t('delete')}">×</button>
     </div>`).join('');
   el.querySelectorAll('[data-pdf]').forEach(b => b.onclick = async () => showReport(await db.get(b.dataset.pdf)));
   el.querySelectorAll('[data-map]').forEach(b => { b.disabled = !map; b.onclick = () => showMissionOnMap(b.dataset.map); });
   el.querySelectorAll('[data-delm]').forEach(b => b.onclick = async () => {
-    if (!confirm('Supprimer définitivement cette mission et ses photos ?')) return;
+    if (!confirm(t('confirmDel'))) return;
     await db.del(b.dataset.delm); renderMissions();
   });
 }
@@ -999,24 +2100,24 @@ async function renderMissions() {
 let report = null;
 function reportName(m) {
   const d = new Date(m.start), p = n => String(n).padStart(2, '0');
-  const slug = m.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
-  return `Rapport_Gazoscan_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}h${p(d.getMinutes())}${slug ? '_' + slug : ''}.pdf`;
+  const slug = m.name.replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
+  return `${t('reportFile')}_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}h${p(d.getMinutes())}${slug ? '_' + slug : ''}.pdf`;
 }
 async function showReport(m) {
   report = null;
-  $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>Génération du rapport${navigator.onLine !== false ? ' et du fond de carte' : ''}…`;
+  $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>${t(navigator.onLine !== false ? 'generatingMap' : 'generating')}`;
   ['btnShare', 'btnDownload'].forEach(id => $(id).disabled = true);
   $('btnResend').hidden = true;
   openModal('dlgReport');
   try {
     const bytes = await buildReport(m);
     report = { file: new File([bytes], reportName(m), { type: 'application/pdf' }), m };
-    $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>${fmtDate(m.start)} · ${m.alarms.length} alarme(s) · ${m.indices.length} indice(s)<br>${Math.max(1, Math.round(bytes.length / 1024))} Ko`;
+    $('rInfo').innerHTML = `<b>${esc(m.name)}</b><br>${fmtDate(m.start)} · ${t('counts', { a: m.alarms.length, i: m.indices.length })}<br>${Math.max(1, Math.round(bytes.length / 1024))} Ko`;
     $('btnDownload').disabled = false;
     renderShareState();
   } catch (e) {
-    log('Erreur rapport : ' + e.message);
-    $('rInfo').textContent = 'Impossible de générer le rapport : ' + e.message;
+    log(t('logReportErr', { e: e.message }));
+    $('rInfo').textContent = t('reportErr', { e: e.message });
   }
 }
 $('btnDownload').onclick = () => {
@@ -1030,11 +2131,11 @@ const canShareFile = () => !!(navigator.canShare && navigator.canShare({ files: 
 function renderShareState() {
   const m = report.m, b = $('btnShare'), r = $('btnResend');
   if (m.sentAt) {
-    b.textContent = `✓ Déjà envoyé le ${fmtDate(m.sentAt)}`;
+    b.textContent = t('alreadySent', { d: fmtDate(m.sentAt) });
     b.disabled = true;
     r.hidden = !canShareFile();
   } else {
-    b.textContent = 'Envoyer…';
+    b.textContent = t('send');
     b.disabled = !canShareFile();
     r.hidden = true;
   }
@@ -1043,19 +2144,19 @@ async function shareReport() {
   const m = report.m;
   $('btnShare').disabled = true;            // évite le double appui pendant l'ouverture du partage
   try {
-    await navigator.share({ files: [report.file], title: 'Rapport Gazoscan – ' + m.name,
-      text: `Rapport de surveillance Gazoscan : ${m.name} (${fmtDate(m.start)})` });
+    await navigator.share({ files: [report.file], title: t('shareTitle', { n: m.name }),
+      text: t('shareText', { n: m.name, d: fmtDate(m.start) }) });
     m.sentAt = Date.now();
     m.sentCount = (m.sentCount || 0) + 1;
     await db.put(m).catch(() => {});
-    log('Rapport envoyé : ' + m.name);
+    log(t('logSent', { n: m.name }));
     renderMissions();
-  } catch (e) { if (e.name !== 'AbortError') log('Partage impossible : ' + e.message); }
+  } catch (e) { if (e.name !== 'AbortError') log(t('logShareErr', { e: e.message })); }
   renderShareState();
 }
 $('btnShare').onclick = shareReport;
 $('btnResend').onclick = () => {
-  if (confirm(`Ce rapport a déjà été envoyé le ${fmtDate(report.m.sentAt)}. L’envoyer à nouveau ?`)) shareReport();
+  if (confirm(t('confirmResend', { d: fmtDate(report.m.sentAt) }))) shareReport();
 };
 
 /* ---------- Mini générateur PDF (texte, dessins, photos JPEG, liens) ---------- */
@@ -1191,10 +2292,10 @@ async function renderBasemap(cx, cy, Sn, wPt, hPt) {
       }).catch(() => false));
     }
     const ok = (await Promise.all(jobs)).filter(Boolean).length;
-    if (!ok) { log('Fond de carte OSM indisponible pour le PDF.'); return null; }
+    if (!ok) { log(t('logOsmNone')); return null; }
     return { data: cv.toDataURL('image/jpeg', 0.85), w: W, h: H };
   } catch (e) {
-    log('Fond de carte OSM : ' + e.message);
+    log(t('logOsm', { e: e.message }));
     return null;
   }
 }
@@ -1209,9 +2310,9 @@ async function buildReport(m, opts = {}) {
   const newPage = () => {
     d.addPage();
     if (d.pages.length > 1) {
-      d.text(M, 28, 'Rapport de surveillance Gazoscan', { size: 8, bold: true, color: C.mute });
-      const t = m.name.length > 70 ? m.name.slice(0, 67) + '…' : m.name;
-      d.text(d.W - M - d.width(t, 8), 28, t, { size: 8, color: C.mute });
+      d.text(M, 28, t('rTitle'), { size: 8, bold: true, color: C.mute });
+      const nm = m.name.length > 70 ? m.name.slice(0, 67) + '…' : m.name;
+      d.text(d.W - M - d.width(nm, 8), 28, nm, { size: 8, color: C.mute });
       d.line([[M, 34], [d.W - M, 34]], C.line, 0.5);
       y = 52;
     }
@@ -1243,7 +2344,7 @@ async function buildReport(m, opts = {}) {
   // ---- En-tête ----
   newPage();
   d.rect(0, 0, d.W, 96, { fill: C.navy });
-  d.text(M, 42, 'Rapport de surveillance Gazoscan', { size: 20, bold: true, color: C.white });
+  d.text(M, 42, t('rTitle'), { size: 20, bold: true, color: C.white });
   wrap(m.name, PW, 12, false).slice(0, 2).forEach((l, i) => d.text(M, 64 + i * 15, l, { size: 12, color: [203, 213, 225] }));
   y = 116;
 
@@ -1251,10 +2352,10 @@ async function buildReport(m, opts = {}) {
   const track = m.track || [];
   const dev = m.device || {};
   const stats = [
-    ['Concentration max', `${fmt(m.maxConc || 0)} ${unit}`, m.alarms.length ? C.red : C.ink],
-    ['Alarmes', String(m.alarms.length), m.alarms.length ? C.red : C.ink],
-    ['Indices', String(m.indices.length), C.ink],
-    ['Distance', fmtDist(trackDist(track)), C.ink]
+    [t('maxConc'), `${fmt(m.maxConc || 0)} ${unit}`, m.alarms.length ? C.red : C.ink],
+    [t('alarms'), String(m.alarms.length), m.alarms.length ? C.red : C.ink],
+    [t('indices'), String(m.indices.length), C.ink],
+    [t('distance'), fmtDist(trackDist(track)), C.ink]
   ];
   const bw = (PW - 30) / 4;
   stats.forEach(([k, v, col], i) => {
@@ -1266,19 +2367,19 @@ async function buildReport(m, opts = {}) {
   y += 70;
 
   const rows = [
-    ['Mission', m.name],
-    ['Opérateur', m.operator || '—'],
-    ['Début', fmtDate(m.start)],
-    ['Fin', m.end ? fmtDate(m.end) : '—'],
-    ['Durée', m.end ? fmtDurLong(m.end - m.start) : '—'],
-    ['Appareil', dev.Appareil || '—'],
+    [t('rMission'), m.name],
+    [t('operator'), m.operator || '—'],
+    [t('rStart'), fmtDate(m.start)],
+    [t('rEnd'), m.end ? fmtDate(m.end) : '—'],
+    [t('duration'), m.end ? fmtDurLong(m.end - m.start) : '—'],
+    [t('dev.Appareil'), dev.Appareil || '—'],
   ];
-  if (dev.Fabricant || dev['Modèle']) rows.push(['Fabricant / modèle', [dev.Fabricant, dev['Modèle']].filter(Boolean).join(' / ')]);
-  if (dev.Firmware || dev.Logiciel) rows.push(['Firmware / logiciel', [dev.Firmware, dev.Logiciel].filter(Boolean).join(' / ')]);
-  rows.push(['Détection', m.threshold
-    ? `Concentration >= ${fmt(m.threshold)} ${unit} (seuil saisi)`
-    : `Concentration >= seuil d’alarme du Gazoscan${m.deviceAlarm ? ` (${fmt(m.deviceAlarm)} ${unit})` : ''}`]);
-  rows.push(['Points GPS', String(track.length)]);
+  if (dev.Fabricant || dev['Modèle']) rows.push([t('rMakerModel'), [dev.Fabricant, dev['Modèle']].filter(Boolean).join(' / ')]);
+  if (dev.Firmware || dev.Logiciel) rows.push([t('rFwSw'), [dev.Firmware, dev.Logiciel].filter(Boolean).join(' / ')]);
+  rows.push([t('rDetection'), m.threshold
+    ? t('detUser', { v: `${fmt(m.threshold)} ${unit}` })
+    : t('detDevice') + (m.deviceAlarm ? ` (${fmt(m.deviceAlarm)} ${unit})` : '')]);
+  rows.push([t('rGpsPts'), String(track.length)]);
   rows.forEach(([k, v], i) => {
     const lines = wrap(v, PW - 150, 10, false);
     const h = lines.length * 14 + 8;
@@ -1290,10 +2391,10 @@ async function buildReport(m, opts = {}) {
   });
 
   // ---- Plan du parcours ----
-  heading('Plan du parcours');
+  heading(t('plan'));
   const pts = [...track, ...m.alarms.filter(a => a.pos).map(a => a.pos), ...m.indices.filter(i => i.pos).map(i => i.pos)];
   if (!pts.length) {
-    para('Aucune position GPS enregistrée pendant la mission.', { color: C.mute });
+    para(t('noGps'), { color: C.mute });
   } else {
     const BH = 300;
     ensure(BH + 40);
@@ -1316,7 +2417,7 @@ async function buildReport(m, opts = {}) {
     if (base) {
       d.image(d.jpeg(base.data, base.w, base.h), bx, by, bwid, BH);
       d.rect(bx, by, bwid, BH, { stroke: C.line, lw: 0.8 });
-      const attr = '© contributeurs OpenStreetMap';
+      const attr = t('osmAttr');
       const aw = d.width(attr, 6.5);
       d.rect(bx + bwid - aw - 8, by + BH - 11, aw + 8, 11, { fill: C.white });
       d.text(bx + bwid - aw - 4, by + BH - 3, attr, { size: 6.5, color: C.mute });
@@ -1349,25 +2450,25 @@ async function buildReport(m, opts = {}) {
     // nord
     const nx = bx + bwid - 22, ny = by + 14;
     d.poly([[nx, ny], [nx - 6, ny + 16], [nx, ny + 12], [nx + 6, ny + 16]], C.ink);
-    d.text(nx - d.width('N', 8, true) / 2, ny + 28, 'N', { size: 8, bold: true });
+    d.text(nx - d.width(t('north'), 8, true) / 2, ny + 28, t('north'), { size: 8, bold: true });
     y = by + BH + 12;
 
     // légende
     let lx = M;
     const leg = (draw, label) => { draw(lx + 5, y + 5); d.text(lx + 14, y + 8.5, label, { size: 8.5, color: C.mute }); lx += 26 + d.width(label, 8.5); };
-    leg((x, yy) => d.line([[x - 5, yy], [x + 5, yy]], C.blue, 2), 'Trajet');
-    leg((x, yy) => d.circle(x, yy, 4, { fill: C.green }), 'Départ');
-    leg((x, yy) => d.rect(x - 4, yy - 4, 8, 8, { fill: C.navy }), 'Arrivée');
-    leg((x, yy) => d.circle(x, yy, 4, { fill: C.orange }), 'Alarme sans indice');
-    leg((x, yy) => d.circle(x, yy, 5, { fill: C.red }), 'Indice');
+    leg((x, yy) => d.line([[x - 5, yy], [x + 5, yy]], C.blue, 2), t('legTrack'));
+    leg((x, yy) => d.circle(x, yy, 4, { fill: C.green }), t('legStart'));
+    leg((x, yy) => d.rect(x - 4, yy - 4, 8, 8, { fill: C.navy }), t('legEnd'));
+    leg((x, yy) => d.circle(x, yy, 4, { fill: C.orange }), t('legAlarm'));
+    leg((x, yy) => d.circle(x, yy, 5, { fill: C.red }), t('indice'));
     y += 22;
   }
 
   // ---- Alarmes ----
-  heading(`Alarmes détectées (${m.alarms.length})`);
-  if (!m.alarms.length) para('Aucun dépassement d’alarme pendant la mission.', { color: C.mute });
+  heading(t('alarmsDetected', { n: m.alarms.length }));
+  if (!m.alarms.length) para(t('noAlarms'), { color: C.mute });
   else {
-    const cols = [[M + 6, 'N°'], [M + 36, 'Heure'], [M + 100, 'Concentration'], [M + 200, 'Position GPS'], [M + 450, 'Indice']];
+    const cols = [[M + 6, t('colN')], [M + 36, t('time')], [M + 100, t('concentration')], [M + 200, t('colPos')], [M + 450, t('indice')]];
     const head = () => {
       d.rect(M, y, PW, 20, { fill: C.soft });
       cols.forEach(([x, t]) => d.text(x, y + 13.5, t, { size: 8.5, bold: true, color: C.mute }));
@@ -1380,26 +2481,26 @@ async function buildReport(m, opts = {}) {
       d.text(cols[1][0], y + 13.5, fmtTime(a.t), { size: 9.5 });
       d.text(cols[2][0], y + 13.5, `${fmt(a.conc)} ${unit}`, { size: 9.5, bold: true, color: C.red });
       if (a.pos) {
-        const t = `${fmtPos(a.pos)} (± ${a.pos.acc} m)`;
-        d.text(cols[3][0], y + 13.5, t, { size: 9.5, color: C.blue });
-        d.link(cols[3][0], y + 3, d.width(t, 9.5), 14, mapUrl(a.pos));
-      } else d.text(cols[3][0], y + 13.5, 'position indisponible', { size: 9.5, color: C.mute });
-      d.text(cols[4][0], y + 13.5, a.indice ? 'n°' + a.indice : '—', { size: 9.5 });
+        const ps = `${fmtPos(a.pos)} (± ${a.pos.acc} m)`;
+        d.text(cols[3][0], y + 13.5, ps, { size: 9.5, color: C.blue });
+        d.link(cols[3][0], y + 3, d.width(ps, 9.5), 14, mapUrl(a.pos));
+      } else d.text(cols[3][0], y + 13.5, t('noPos'), { size: 9.5, color: C.mute });
+      d.text(cols[4][0], y + 13.5, a.indice ? t('nShort', { n: a.indice }) : '—', { size: 9.5 });
       y += 20;
       d.line([[M, y], [d.W - M, y]], C.line, 0.5);
     });
   }
 
   // ---- Indices ----
-  heading(`Indices (${m.indices.length})`);
-  if (!m.indices.length) para('Aucun indice enregistré.', { color: C.mute });
+  heading(t('indicesTitle', { n: m.indices.length }));
+  if (!m.indices.length) para(t('noIndices'), { color: C.mute });
   m.indices.forEach(ind => {
     ensure(110);
     d.rect(M, y, PW, 26, { fill: [254, 242, 242] });
     d.circle(M + 16, y + 13, 9, { fill: C.red });
     const nb = String(ind.n);
     d.text(M + 16 - d.width(nb, 9, true) / 2, y + 16.2, nb, { size: 9, bold: true, color: C.white });
-    d.text(M + 32, y + 17, `Indice n°${ind.n}`, { size: 11.5, bold: true });
+    d.text(M + 32, y + 17, t('indiceN', { n: ind.n }), { size: 11.5, bold: true });
     const right = `${fmt(ind.conc)} ${unit}`;
     d.text(d.W - M - 10 - d.width(right, 11.5, true), y + 17, right, { size: 11.5, bold: true, color: C.red });
     y += 34;
@@ -1413,11 +2514,11 @@ async function buildReport(m, opts = {}) {
       });
       y += lines.length * 14 + 4;
     };
-    kv('Date et heure', `${new Date(ind.t).toLocaleDateString('fr-FR')} à ${fmtTime(ind.t)}`);
-    kv('Alarme', 'n°' + ind.alarm);
-    if (ind.pos) kv('Position', `${fmtPos(ind.pos)} (± ${ind.pos.acc} m) – ouvrir la carte`, mapUrl(ind.pos));
-    else kv('Position', 'indisponible');
-    kv('Annotation', ind.note || '—');
+    kv(t('dateTime'), t('at', { d: new Date(ind.t).toLocaleDateString(LOCALE), t: fmtTime(ind.t) }));
+    kv(t('alarm'), t('nShort', { n: ind.alarm }));
+    if (ind.pos) kv(t('position'), t('openMap', { p: fmtPos(ind.pos), a: ind.pos.acc }), mapUrl(ind.pos));
+    else kv(t('position'), t('unavailable'));
+    kv(t('note'), ind.note || '—');
     const pw = (PW - 12) / 2;
     for (let i = 0; i < ind.photos.length; i += 2) {
       const row = ind.photos.slice(i, i + 2).map(ph => {
@@ -1439,15 +2540,15 @@ async function buildReport(m, opts = {}) {
   });
 
   // ---- Pieds de page ----
-  const gen = `Généré le ${fmtDate(Date.now())} par Gazoscan Web v${APP_VERSION}`;
+  const gen = t('generated', { d: fmtDate(Date.now()), v: APP_VERSION });
   d.pages.forEach((p, i) => {
     d.setPage(p);
     d.line([[M, d.H - 34], [d.W - M, d.H - 34]], C.line, 0.5);
     d.text(M, d.H - 22, gen, { size: 7.5, color: C.mute });
-    const t = `Page ${i + 1} / ${d.pages.length}`;
-    d.text(d.W - M - d.width(t, 7.5), d.H - 22, t, { size: 7.5, color: C.mute });
+    const pg = t('page', { i: i + 1, n: d.pages.length });
+    d.text(d.W - M - d.width(pg, 7.5), d.H - 22, pg, { size: 7.5, color: C.mute });
   });
-  return d.build('Rapport Gazoscan – ' + m.name);
+  return d.build(t('shareTitle', { n: m.name }));
 }
 
 /* =====================================================================
